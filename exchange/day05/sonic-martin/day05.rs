@@ -41,9 +41,6 @@ fn main() -> Result<(), String> {
         updates.push(line.split(',').map(|s| s.parse::<i32>().unwrap()).collect::<Vec<i32>>());
     }
 
-    println!("{:?}", ordering_rules);
-    // println!("{:?}", updates);
-
     // Task 1: Determine which updates are already in the correct order.
     // What do you get if you add up the middle page number from those correctly-ordered updates?
     let mut valid = 0;
@@ -77,7 +74,6 @@ fn main() -> Result<(), String> {
 }
 
 fn is_valid_update(update: &Vec<i32>, ordering_rules: &HashMap<i32, Vec<i32>>) -> bool {
-    //println!("is_valid_update(update={:?}, rules={:?})", update, ordering_rules);
     let mut printed: HashSet<i32> = HashSet::new();
     for i in 0..update.len() {
         let current_page = update[i];
