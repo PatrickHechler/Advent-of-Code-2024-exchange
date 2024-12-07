@@ -1,11 +1,6 @@
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Scanner;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * see: https://adventofcode.com/2024/day/7
@@ -18,33 +13,25 @@ public class Y24Day07 {
 		return Long.parseLong(Long.toString(num1)+Long.toString(num2));
 	}
 	
-	private static void addIfLE(Set<Long> nextAlternatives, long result, long possibleNextAlternative) {
-		if (result<possibleNextAlternative) {
-			return;
+	private static boolean recursiveSolve(long result, long[] arguments, int currentPos, long currentValue, boolean part2) {
+		if (currentValue > result) {
+			return false;
 		}
-		nextAlternatives.add(possibleNextAlternative);
-	}
-	
-	private static boolean recursiveSolve(Set<Long> alternatives, long result, List<Long> arguments, boolean part2) {
-		if (arguments.isEmpty()) {
-			return alternatives.contains(result);
+		if (currentPos == arguments.length) {
+			return currentValue == result;
 		}
-		final long nextArg = arguments.removeFirst();
-		Set<Long> nextAlternatives = new HashSet<>();
-		for (long alternative:alternatives) {
-			addIfLE(nextAlternatives, result, alternative+nextArg);
-			addIfLE(nextAlternatives, result, alternative*nextArg);
-			if (part2) {
-				addIfLE(nextAlternatives, result, concat(alternative,nextArg));
-			}
+		long currentArgument = arguments[currentPos];
+		boolean ok = false;
+		ok = ok || recursiveSolve(result, arguments, currentPos+1, currentValue+currentArgument, part2);
+		ok = ok || recursiveSolve(result, arguments, currentPos+1, currentValue*currentArgument, part2);
+		if (part2) {
+			ok = ok || recursiveSolve(result, arguments, currentPos+1, concat(currentValue,currentArgument), part2);
 		}
-		return recursiveSolve(nextAlternatives, result, arguments, part2);
+		return ok;
 	}
 
-	private static boolean solvable(long result, List<Long> arguments, boolean part2) {
-		Set<Long> alternatives = new HashSet<>();
-		alternatives.add(arguments.removeFirst());
-		return recursiveSolve(alternatives, result, arguments, part2);
+	private static boolean solvable(long result, long[] arguments, boolean part2) {
+		return recursiveSolve(result, arguments, 1, arguments[0], part2);
 	}
 
 	public static void mainPart1(String inputfile) throws FileNotFoundException {
@@ -57,7 +44,11 @@ public class Y24Day07 {
 					continue;
 				}
 				long result = Long.parseLong(line.split(":")[0]);
-				List<Long> arguments = Arrays.asList(line.split(":")[1].trim().split(" ")).stream().map(s->Long.parseLong(s)).collect(Collectors.toList());
+				String[] strArguments = line.split(":")[1].trim().split(" ");
+				long[] arguments = new long[strArguments.length];
+				for (int i=0; i<strArguments.length; i++) {
+					arguments[i] = Long.parseLong(strArguments[i]);
+				}
 				if (solvable(result, arguments, false)) {
 					solution += result;
 				}
@@ -68,6 +59,7 @@ public class Y24Day07 {
 
 
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
+		
 		long solution = 0;
 		try (Scanner scanner = new Scanner(new File(inputfile))) {
 			while (scanner.hasNext()) {
@@ -76,7 +68,11 @@ public class Y24Day07 {
 					continue;
 				}
 				long result = Long.parseLong(line.split(":")[0]);
-				List<Long> arguments = Arrays.asList(line.split(":")[1].trim().split(" ")).stream().map(s->Long.parseLong(s)).collect(Collectors.toList());
+				String[] strArguments = line.split(":")[1].trim().split(" ");
+				long[] arguments = new long[strArguments.length];
+				for (int i=0; i<strArguments.length; i++) {
+					arguments[i] = Long.parseLong(strArguments[i]);
+				}
 				if (solvable(result, arguments, true)) {
 					solution += result;
 				}
@@ -89,13 +85,17 @@ public class Y24Day07 {
 	
 	public static void main(String[] args) throws FileNotFoundException {
 		System.out.println("--- PART I  ---");
-//		mainPart1("exchange/day07/feri/input-example.txt");
-		mainPart1("exchange/day07/feri/input.txt");     
+		StopWatch7.run("Day 7 Part 1", () -> {
+//			mainPart1("exchange/day07/feri/input-example.txt");
+			mainPart1("exchange/day07/feri/input.txt");     
+		});
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-//		mainPart2("exchange/day07/feri/input-example.txt");
-		mainPart2("exchange/day07/feri/input.txt");
+		StopWatch7.run("Day 7 Part 2", () -> {
+//			mainPart2("exchange/day07/feri/input-example.txt");
+			mainPart2("exchange/day07/feri/input.txt");
+		});	
 		System.out.println("---------------");
 	}
 
