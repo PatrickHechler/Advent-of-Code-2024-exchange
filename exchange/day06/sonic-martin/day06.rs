@@ -19,7 +19,7 @@ fn main() -> Result<(), String> {
     // Arg parsing
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        return Err(String::from("Usage: cargo run --bin day6 INPUT"));
+        return Err(String::from("Usage: cargo run --bin day06 INPUT"));
     }
 
     // Prepare file for reading
