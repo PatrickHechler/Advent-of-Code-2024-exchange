@@ -21,7 +21,8 @@ public class Y24Day07 {
 			return currentValue == result;
 		}
 		long currentArgument = arguments[currentPos];
-		boolean ok = recursiveSolve(result, arguments, currentPos+1, currentValue+currentArgument, part2);
+		boolean ok = false;
+		ok = ok || recursiveSolve(result, arguments, currentPos+1, currentValue+currentArgument, part2);
 		ok = ok || recursiveSolve(result, arguments, currentPos+1, currentValue*currentArgument, part2);
 		if (part2) {
 			ok = ok || recursiveSolve(result, arguments, currentPos+1, concat(currentValue,currentArgument), part2);
