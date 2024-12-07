@@ -40,21 +40,25 @@ static num calc(num target, num first, num count, num *nums) {
 	}
 	num second = *nums;
 	num mul = first * second;
-	num res_mul = calc(target, mul, count - 1, nums + 1);
+	num res = calc(target, mul, count - 1, nums + 1);
+	if (res == target) {
+		return res;
+	}
 	num add = first + second;
-	num res_add = calc(target, add, count - 1, nums + 1);
-	num diff_mul = target - res_mul;
-	if (diff_mul < 0) {
-		diff_mul = -diff_mul;
+	res = calc(target, add, count - 1, nums + 1);
+	if (part == 1 || res == target) {
+		return res;
 	}
-	num diff_add = target - res_add;
-	if (diff_add < 0) {
-		diff_add = -diff_add;
+	num first_mul = 1;
+	for (num second_second = second; second_second;
+			second_second /= 10, first_mul *= 10)
+		;
+	if (first_mul == 1) {
+		first_mul = 10;
 	}
-	if (diff_mul < diff_add) {
-		return res_mul;
-	}
-	return res_add;
+	first *= first_mul;
+	first += second;
+	return calc(target, first, count - 1, nums + 1);
 }
 
 char* solve(char *path) {
