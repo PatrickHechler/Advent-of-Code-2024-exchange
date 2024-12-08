@@ -86,25 +86,43 @@ static void calc_antenna_antinods(const void *nodep, VISIT value, int level) {
 			}
 			num x_diff = a->x - cur_a->x;
 			num y_diff = a->y - cur_a->y;
-			num x0 = a->x + x_diff;
-			num y0 = a->y + y_diff;
-			num x1 = cur_a->x - x_diff;
-			num y1 = cur_a->y - y_diff;
-			if (x0 >= 0 && y0 >= 0 && x0 < data->line_length
-					&& y0 < data->line_count) {
-				data->lines[y0][x0] = '#';
+			if (part == 1) {
+				num x0 = a->x + x_diff;
+				num y0 = a->y + y_diff;
+				num x1 = cur_a->x - x_diff;
+				num y1 = cur_a->y - y_diff;
+				if (x0 >= 0 && y0 >= 0 && x0 < data->line_length
+						&& y0 < data->line_count) {
+					data->lines[y0][x0] = '#';
+				} else {
+					printf(
+							"the antinode 0 (" NUMF "|" NUMF ") is out of map (%ld|%ld)\n",
+							x0, y0, data->line_length, data->line_count);
+				}
+				if (x1 >= 0 && y1 >= 0 && x1 < data->line_length
+						&& y1 < data->line_count) {
+					data->lines[y1][x1] = '#';
+				} else {
+					printf(
+							"the antinode 1 (" NUMF "|" NUMF ") is out of map (%ld|%ld)\n",
+							x1, y1, data->line_length, data->line_count);
+				}
 			} else {
-				printf(
-						"the antinode 0 (" NUMF "|" NUMF ") is out of map (%ld|%ld)\n",
-						x0, y0, data->line_length, data->line_count);
-			}
-			if (x1 >= 0 && y1 >= 0 && x1 < data->line_length
-					&& y1 < data->line_count) {
-				data->lines[y1][x1] = '#';
-			} else {
-				printf(
-						"the antinode 1 (" NUMF "|" NUMF ") is out of map (%ld|%ld)\n",
-						x1, y1, data->line_length, data->line_count);
+				// should x_diff and y_diff be shorted?
+				int redo = 0;
+				do {
+					num x = a->x;
+					num y = a->y;
+					do {
+						data->lines[y][x] = '#';
+						x += x_diff;
+						y += y_diff;
+					} while (x >= 0 && y >= 0 && x < data->line_length
+							&& y < data->line_count);
+					redo = !redo;
+					x_diff = -x_diff;
+					y_diff = -y_diff;
+				} while (redo);
 			}
 		} else {
 			cur_a = a;
