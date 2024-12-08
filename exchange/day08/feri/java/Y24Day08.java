@@ -95,10 +95,30 @@ public class Y24Day08 {
 			addAntinode(antenna2.add(v));
 			addAntinode(antenna1.sub(v));
 		}
-		private void addAntinode(Pos p) {
+		public void addAntinodesLine(List<Pos> antennasPos) {
+			for (int i=0; i<antennasPos.size(); i++) {
+				for (int j=i+1; j<antennasPos.size(); j++) {
+					addAntinodesLine(antennasPos.get(i), antennasPos.get(j));
+				}
+			}
+		}
+		private void addAntinodesLine(Pos antenna1, Pos antenna2) {
+			Pos v = antenna2.sub(antenna1);
+			Pos p = antenna2;
+			while (addAntinode(p)) {
+				p = p.add(v);
+			}
+			p = antenna1;
+			while (addAntinode(p)) {
+				p = p.sub(v);
+			}
+		}
+		private boolean addAntinode(Pos p) {
 			if ((p.x>=0) && (p.y>=0) && (p.x<maxX) && (p.y<maxY)) {
 				antinodes.add(p);
+				return true;
 			}
+			return false;
 		}
 	}
 
@@ -124,6 +144,22 @@ public class Y24Day08 {
 
 
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
+		World world = new World();
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line = scanner.nextLine().trim();
+				if (line.isBlank()) {
+					continue;
+				}
+				world.addRow(line);
+			}
+		}
+		System.out.println(world);
+		Map<Character, List<Pos>> occurrences = world.findOccurrences();
+		for (char c:occurrences.keySet()) {
+			world.addAntinodesLine(occurrences.get(c));
+		}
+		System.out.println("Antinodes: "+world.antinodes.size());
 	}
 
 
@@ -135,8 +171,8 @@ public class Y24Day08 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day08/feri/input-example.txt");
-//		mainPart2("exchange/day08/feri/input.txt");
+//		mainPart2("exchange/day08/feri/input-example.txt");
+		mainPart2("exchange/day08/feri/input.txt");
 		System.out.println("---------------");
 	}
 
