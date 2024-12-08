@@ -114,7 +114,6 @@ fn main() -> Result<(), String> {
 
                 let mut anti = Point { x: ant1.x, y: ant1.y };
                 loop {
-
                     if ant1.x < ant2.x {
                         anti.x -= dx;
                     } else {
