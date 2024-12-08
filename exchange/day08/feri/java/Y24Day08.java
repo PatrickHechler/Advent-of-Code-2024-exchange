@@ -134,7 +134,6 @@ public class Y24Day08 {
 				world.addRow(line);
 			}
 		}
-		System.out.println(world);
 		Map<Character, List<Pos>> occurrences = world.findOccurrences();
 		for (char c:occurrences.keySet()) {
 			world.addAntinodes(occurrences.get(c));
@@ -154,7 +153,6 @@ public class Y24Day08 {
 				world.addRow(line);
 			}
 		}
-		System.out.println(world);
 		Map<Character, List<Pos>> occurrences = world.findOccurrences();
 		for (char c:occurrences.keySet()) {
 			world.addAntinodesLine(occurrences.get(c));
