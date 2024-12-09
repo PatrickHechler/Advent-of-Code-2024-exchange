@@ -191,8 +191,8 @@ public class Y24Day06withGUI {
 	
 	public static void main(String[] args) throws FileNotFoundException {
 		System.out.println("--- PART I  ---");
-		mainPart1("exchange/day06/feri/input-example.txt");
-//		mainPart1("exchange/day06/feri/input.txt");     
+//		mainPart1("exchange/day06/feri/input-example.txt");
+		mainPart1("exchange/day06/feri/input.txt");     
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
