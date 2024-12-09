@@ -37,32 +37,69 @@ static char* solve(char *path) {
 	memset(file_system, 255, block_count * sizeof(num));
 	char *end = data->data + strlen(data->data) - 2;
 	if ((end - data->data) & 1) {
-		end++;
+		abort();
 	}
-	for (char *c = data->data; c <= end0; c += 2) {
-		for (char i = '0'; i < *c; i++, fs++) {
-			*fs = (c - data->data) / 2;
+	if (part == 1) {
+		for (char *c = data->data; c <= end; c += 2) {
+			for (char i = '0'; i < *c; i++, fs++) {
+				*fs = (c - data->data) / 2;
+			}
+			for (char i = '0'; i < c[1]; i++, fs++) {
+				while (*end == '0' && end > c) {
+					end -= 2;
+				}
+				if (end <= c) {
+					break;
+				}
+				--*end;
+				*fs = (end - data->data) / 2;
+			}
 		}
-		for (char i = '0'; i < c[1]; i++, fs++) {
-			while (*end == '0' && end > c) {
-				end -= 2;
+	} else {
+		for (char *c = data->data; c <= end; c += 2) {
+			for (char i = '0'; i < *c; i++, fs++) {
+				*fs = (c - data->data) / 2;
 			}
-			if (end <= c) {
-				break;
-			}
-			if (part == 2 && *end < c[1]) {
+			fs += c[1] - '0';
+		}
+		for (num start_i = block_count - 1; start_i >= 0; --start_i) {
+			if (file_system[start_i] < 0) {
 				continue;
 			}
-			--*end;
-			*fs = (end - data->data) / 2;
+			num end_i = start_i;
+			for (start_i--;
+					start_i >= 0 && file_system[end_i] == file_system[start_i];
+					--start_i)
+				;
+			num len = end_i - start_i++;
+			num new_i;
+			for (new_i = 0; new_i < start_i; ++new_i) {
+				if (file_system[new_i] >= 0) {
+					continue;
+				}
+				num start_new_i = new_i;
+				for (new_i++; new_i < start_i && file_system[new_i] < 0; ++new_i)
+					;
+				num max_len = new_i-- - start_new_i;
+				if (max_len >= len) {
+					memcpy(file_system + start_new_i, file_system + start_i,
+							len * sizeof(num));
+					memset(file_system + start_i, 255, len * sizeof(num));
+					break;
+				}
+			}
 		}
 	}
 	puts(data->data);
-	for (int i = 0; file_system[i] >= 0; ++i) {
+	for (int i = 0; i < block_count; ++i) {
 		printf(NUMF ", ", file_system[i]);
-		result += file_system[i] * i;
+		if (file_system[i] > 0) {
+			result += file_system[i] * i;
+		} else if (part == 1 && file_system[i] < 0) {
+			break;
+		}
 	}
-	puts("-1");
+	puts("-");
 	return u64toa(result);
 }
 
@@ -76,6 +113,10 @@ static struct data* parse_line(struct data *data, char *line) {
 	while (isspace(*--end))
 		;
 	end++;
+	if ((end - line) & 1) {
+		*end = '0';
+		end++;
+	}
 	*end = '\0';
 	if (data) {
 		fprintf(stderr, "multiple lines contain data!\n");
