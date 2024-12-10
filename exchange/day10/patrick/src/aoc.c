@@ -91,7 +91,6 @@ static char* solve(char *path) {
 				free(ninesl);
 				ninesl = nn;
 			}
-			print(stdout, data, result);
 		}
 	}
 	print(stdout, data, result);
