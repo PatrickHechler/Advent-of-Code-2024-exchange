@@ -89,6 +89,23 @@ public class Y24Day10 {
 			}
 			return trailEnds.size();
 		}
+		public int countTrailsPart2(Pos trailStart) {
+
+			List<Pos> trailEnds = new ArrayList<>();
+			trailEnds.add(trailStart);
+			for (int height=1; height<=9; height++) {
+				List<Pos> nextTrailEnds = new ArrayList<>();
+				for (Pos trailEnd:trailEnds) {
+					for (Pos neighbour:trailEnd.neighbours()) {
+						if (get(neighbour) == height) {
+							nextTrailEnds.add(neighbour);
+						}
+					}
+				}
+				trailEnds = nextTrailEnds;
+			}
+			return trailEnds.size();
+		}
 	}
 
 	public static void mainPart1(String inputfile) throws FileNotFoundException {
@@ -115,6 +132,25 @@ public class Y24Day10 {
 
 
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
+
+		World world = new World();
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line = scanner.nextLine().trim();
+				if (line.isBlank()) {
+					continue;
+				}
+				world.addRow(line);
+			}
+		}
+		List<Pos> trailStarts = world.findTrailStarts();
+		int solution = 0;
+		for (Pos trailStart:trailStarts) {
+			int cnt = world.countTrailsPart2(trailStart);
+			System.out.println("Number of trails from "+trailStart+": "+cnt+" trails");
+			solution = solution + cnt; 
+		}
+		System.out.println("Solutions: "+solution);
 	}
 
 
@@ -126,8 +162,8 @@ public class Y24Day10 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day10/feri/input-example.txt");
-//		mainPart2("exchange/day10/feri/input.txt");
+//		mainPart2("exchange/day10/feri/input-example-p2.txt");
+		mainPart2("exchange/day10/feri/input.txt");
 		System.out.println("---------------");
 	}
 
