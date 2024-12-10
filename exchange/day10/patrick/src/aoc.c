@@ -50,12 +50,14 @@ static uint64_t hiking_trails(struct data *data, num x, num y,
 		struct pos_list **nines) {
 	char cur = data->lines[y][x];
 	if (cur == '9') {
-		struct pos_list *pl = malloc(sizeof(struct pos_list));
-		pl->pos.x = x;
-		pl->pos.y = y;
-		pl->next = *nines;
-		*nines = pl;
-		data->lines[y][x] = '.';
+		if (part == 1) {
+			struct pos_list *pl = malloc(sizeof(struct pos_list));
+			pl->pos.x = x;
+			pl->pos.y = y;
+			pl->next = *nines;
+			*nines = pl;
+			data->lines[y][x] = '.';
+		}
 		return 1;
 	}
 	char next = cur + 1;
