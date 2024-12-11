@@ -113,6 +113,10 @@ public class Y24Day11 {
 			}
 			return result;
 		}
+		@Override
+			public String toString() {
+				return count+"x"+value;
+			}
 	}
 
 
@@ -128,7 +132,7 @@ public class Y24Day11 {
 		System.out.println(NUM.nums);
 		for (int n=1; n<=75; n++) {
 			NUM.blinkAll();
-			System.out.println(n+": "+NUM.countAll());
+			System.out.println(n+": "+NUM.countAll()+" ("+NUM.nums.size()+")");
 		}
 		System.out.println("#numbers: "+NUM.countAll());
 		System.out.println("#distinct numbers: "+NUM.nums.size());
