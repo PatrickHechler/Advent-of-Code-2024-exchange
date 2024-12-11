@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <search.h>
 
-#define DAY 9
+#define DAY 10
 int part = 2;
 
 typedef int num;
