@@ -6,6 +6,7 @@
  */
 
 #include "aoc.h"
+#include "hash.h"
 
 #include <ctype.h>
 #include <stddef.h>
@@ -73,15 +74,74 @@ static void blink(struct data *data) {
 	data->stones_count = new_stones_count;
 }
 
+struct result {
+	uint64_t result;
+	stone stone;
+	int remain_blinks;
+};
+
+static uint64_t res_h(const void *a) {
+	const struct result *ra = (const struct result*) a;
+	return ra->stone * 31 + ra->remain_blinks;
+}
+
+static int res_eq(const void *a, const void *b) {
+	const struct result *ra = (const struct result*) a, *rb =
+			(const struct result*) b;
+	return ra->stone == rb->stone && ra->remain_blinks == rb->remain_blinks;
+}
+
+static uint64_t blinkN(struct hashset *hs, stone s, int count) {
+	struct result arg = { .stone = s, .remain_blinks = count };
+	struct result *res = hs_get(hs, &arg);
+	if (res) {
+		return res->result;
+	}
+	uint64_t result = 1;
+	while (count-- > 0) {
+		if (s == 0) {
+			s = 1;
+			continue;
+		}
+		size_t mul = 1;
+		int even = 1;
+		for (stone s2 = s; s2; s2 /= 10, even ^= 1) {
+			if (even) {
+				mul *= 10;
+			}
+		}
+		if (even) {
+			result += blinkN(hs, s / mul, count);
+			s %= mul;
+		} else {
+			s *= 2024;
+		}
+	}
+	res = malloc(sizeof(struct result));
+	res->result = result;
+	res->stone = arg.stone;
+	res->remain_blinks = arg.remain_blinks;
+	if (hs_set(hs, res)) {
+		fprintf(stderr,
+				"the stone " NUMF ":%d has been calculated multiple times\n",
+				arg.stone, arg.remain_blinks);
+		abort();
+	}
+	return result;
+}
+
 static char* solve(char *path) {
 	struct data *data = read_data(path);
 	print(stdout, data, data->stones_count);
-	for (int i = 0; i < 25; ++i) {
-		printf("blink %d %s\n", i, u64toa(data->stones_count));
-		blink(data);
+	uint64_t result = 0;
+	struct hashset hs = { .equal = res_eq, .hash = res_h };
+	for (size_t i = 0; i < data->stones_count; ++i) {
+		printf("stone %lu of %lu (result=%s)\n", i + 1, data->stones_count,
+				u64toa(result));
+		result += blinkN(&hs, data->stones[i], part == 1 ? 25 : 75);
 	}
-	print(stdout, data, data->stones_count);
-	return u64toa(data->stones_count);
+	print(stdout, data, result);
+	return u64toa(result);
 }
 
 static struct data* parse_line(struct data *data, char *line) {
