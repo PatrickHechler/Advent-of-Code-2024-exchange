@@ -247,18 +247,16 @@ void* reallocarray(void*ptr, size_t nmemb, size_t size) {
 #endif
 
 char* u64toa(uint64_t value) {
-	char *result = malloc(21);
+	static char result[23];
 	if (sprintf(result, "%llu", (unsigned long long) value) <= 0) {
-		free(result);
 		return 0;
 	}
 	return result;
 }
 
 char* d64toa(int64_t value) {
-	char *result = malloc(21);
+	static char result[23];
 	if (sprintf(result, "%lld", (unsigned long long) value) <= 0) {
-		free(result);
 		return 0;
 	}
 	return result;
