@@ -131,6 +131,7 @@ public class Y24Day11 {
 			System.out.println(n+": "+NUM.countAll());
 		}
 		System.out.println("#numbers: "+NUM.countAll());
+		System.out.println("#distinct numbers: "+NUM.nums.size());
 	}
 
 
