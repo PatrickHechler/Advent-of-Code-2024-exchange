@@ -318,7 +318,7 @@ int main(int argc, char **argv) {
 			f = argv[idx];
 		}
 	}
-	parse_end: if (!f) {
+	if (!f) {
 		f = "rsrc/data.txt";
 	} else if (!strchr(f, '/')) {
 		char *f2 = malloc(64);
