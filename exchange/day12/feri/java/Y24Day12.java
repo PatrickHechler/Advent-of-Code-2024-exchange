@@ -158,6 +158,79 @@ public class Y24Day12 {
 			}
 			return result;
 		}
+		public int calcDiscountedFencingCosts() {
+			for (int y=0; y<maxY; y++) {
+				for (int x=0; x<maxX; x++) {
+					Pos p = new Pos(x,y);
+					char c = get(p);
+					Area areaLeft = pos2areasMap.get(p.left());
+					Area areaUp = pos2areasMap.get(p.up());
+					Area joinArea = null;
+					if ((areaUp!=null) && areaUp.is(c)) {
+						joinArea = areaUp.getRoot();
+					}
+					if ((areaLeft!=null) && areaLeft.is(c)) {
+						if (joinArea != null) {
+							Area childArea = areaLeft.getRoot();
+							if (joinArea != childArea) {
+								childArea.join(joinArea);
+							}
+						}
+						else {
+							joinArea = areaLeft.getRoot();
+						}
+					}
+					if (joinArea == null) {
+						joinArea = new Area(c);
+						areas.add(joinArea);
+					}
+					int fences = 0;
+					if (checkFence(p, p.left())) {
+						fences++;
+						if (isSameArea(p, p.up())) {
+							if (checkFence(p.up(), p.up().left())) {
+								fences--;
+							}
+						}
+					}
+					if (checkFence(p, p.up())) {
+						fences++;
+						if (isSameArea(p, p.left())) {
+							if (checkFence(p.left(), p.left().up())) {
+								fences--;
+							}
+						}
+					}
+					if (checkFence(p, p.right())) {
+						fences++;
+						if (isSameArea(p, p.up())) {
+							if (checkFence(p.up(), p.up().right())) {
+								fences--;
+							}
+						}
+					}
+					if (checkFence(p, p.down())) {
+						fences++;
+						if (isSameArea(p, p.left())) {
+							if (checkFence(p.left(), p.left().down())) {
+								fences--;
+							}
+						}
+					}
+					pos2areasMap.put(p, joinArea);
+					joinArea.addField(fences);
+				}
+			}
+			System.out.println(areas.stream().filter(a -> a.isRoot()).toList());
+			int result = areas.stream().filter(a -> a.isRoot()).mapToInt(a->a.getSize()*a.perimeter).sum();
+			return result;
+		}
+		private boolean isSameArea(Pos p1, Pos p2) {
+			return get(p1) == get(p2);
+		}
+		private boolean checkFence(Pos p1, Pos p2) {
+			return !isSameArea(p1, p2);
+		}
 	}
 
 	public static void mainPart1(String inputfile) throws FileNotFoundException {
@@ -172,12 +245,22 @@ public class Y24Day12 {
 				world.addRow(line);
 			}
 		}
-		
 		System.out.println("fencing cost: "+world.calcFencingCosts());
 	}
 
 
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
+		World world = new World();
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line = scanner.nextLine().trim();
+				if (line.isBlank()) {
+					continue;
+				}
+				world.addRow(line);
+			}
+		}
+		System.out.println("discounted fencing cost: "+world.calcDiscountedFencingCosts());
 	}
 
 
@@ -190,8 +273,8 @@ public class Y24Day12 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day12/feri/input-example.txt");
-//		mainPart2("exchange/day12/feri/input.txt");
+//		mainPart2("exchange/day12/feri/input-example.txt");
+		mainPart2("exchange/day12/feri/input.txt");
 		System.out.println("---------------");
 	}
 
