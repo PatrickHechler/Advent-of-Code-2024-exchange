@@ -42,9 +42,106 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 	}
 }
 
-#define REGION_WORK_CHAR '\377'
+#define REGION_WORK_CHAR (part == 2 ? (char) 4 : '\377')
 
-static uint64_t calc_region_border(struct data *data, num x, num y) {
+static int is_border(struct data *data, char c, char nc, num x, num y) {
+	if (x < 0 || y < 0 || x >= data->line_length || y >= data->line_count) {
+		return 1;
+	}
+	return data->lines[y][x] != c && data->lines[y][x] != nc;
+}
+
+static uint64_t calc_region_dir_border(struct data *data, num x, num y,
+		int call);
+
+static uint64_t calc_region_dir_border_if_match(struct data *data, char c,
+		num x, num y, int call) {
+	if (x < 0 || y < 0 || x >= data->line_length || y >= data->line_count) {
+		return 0;
+	}
+	if (data->lines[y][x] != c) {
+		return 0;
+	}
+	return calc_region_dir_border(data, x, y, call);
+}
+
+static uint64_t calc_region_side(struct data *data, char c, char nc, num x,
+		num y, num xadd, num yadd, int call) {
+	data->lines[y][x] = nc;
+	num nx = x + xadd;
+	num ny = y + yadd;
+	if (!is_border(data, c, nc, nx, ny)) {
+		uint64_t result = 0;
+		result += calc_region_dir_border_if_match(data, c, x + 1, y, call);
+		result += calc_region_dir_border_if_match(data, c, x - 1, y, call);
+		result += calc_region_dir_border_if_match(data, c, x, y + 1, call);
+		result += calc_region_dir_border_if_match(data, c, x, y - 1, call);
+		return result;
+	}
+	num dirxadd2 = yadd;
+	num diryadd2 = xadd;
+	int search_run = 1;
+	uint64_t result = 1;
+	while (78) {
+		for (num xadd2 = dirxadd2 * search_run, yadd2 = diryadd2 * search_run;
+				y + yadd2 < data->line_count && x + xadd2 < data->line_length;
+				xadd2 += dirxadd2, yadd2 += diryadd2) {
+			if (data->lines[y + yadd2][x + xadd2] != c
+					&& data->lines[y + yadd2][x + xadd2] != nc) {
+				break;
+			}
+			if (!search_run) {
+				nx = x + xadd2;
+				ny = y + yadd2;
+				result += calc_region_dir_border_if_match(data, c, nx + 1, ny,
+						call);
+				result += calc_region_dir_border_if_match(data, c, nx - 1, ny,
+						call);
+				result += calc_region_dir_border_if_match(data, c, nx, ny + 1,
+						call);
+				result += calc_region_dir_border_if_match(data, c, nx, ny - 1,
+						call);
+			} else {
+				nx = x + xadd + xadd2;
+				ny = y + yadd + yadd2;
+				if (!is_border(data, c, nc, nx, ny)) {
+					break;
+				}
+				data->lines[y + yadd2][x + xadd2] = nc;
+			}
+		}
+		if (xadd != diryadd2 || yadd != dirxadd2) {
+			if (!search_run) {
+				break;
+			}
+			search_run = 0;
+		}
+		dirxadd2 = -dirxadd2;
+		diryadd2 = -diryadd2;
+	}
+	return result;
+}
+
+static uint64_t calc_region_dir_border(struct data *data, num x, num y,
+		int call) {
+	char c = data->lines[y][x];
+	char nc = call;
+	uint64_t result = 0;
+	if (call == 1) {
+		result += calc_region_side(data, c, nc, x, y, 0, 1, call);
+	} else if (call == 2) {
+		result += calc_region_side(data, c, nc, x, y, 0, -1, call);
+	} else if (call == 3) {
+		result += calc_region_side(data, c, nc, x, y, 1, 0, call);
+	} else if (call == 4) {
+		result += calc_region_side(data, c, nc, x, y, -1, 0, call);
+	} else {
+		abort();
+	}
+	return result;
+}
+
+static uint64_t calc_region_border_p1(struct data *data, num x, num y) {
 	char c = data->lines[y][x];
 	data->lines[y][x] = REGION_WORK_CHAR;
 	uint64_t result = 0;
@@ -71,6 +168,18 @@ static uint64_t calc_region_border(struct data *data, num x, num y) {
 		result++;
 	}
 	return result;
+}
+
+static uint64_t calc_region_border(struct data *data, num x, num y) {
+	if (part == 2) {
+		uint64_t l_result = calc_region_dir_border(data, x, y, 1);
+		uint64_t r_result = calc_region_dir_border(data, x, y, 2);
+		uint64_t u_result = calc_region_dir_border(data, x, y, 3);
+		uint64_t d_result = calc_region_dir_border(data, x, y, 4);
+//		calc_region_border_p1(data, x, y); /* fill area with new unused char */
+		return l_result + r_result + u_result + d_result;
+	}
+	return calc_region_border_p1(data, x, y);
 }
 
 static uint64_t calc_region_area(struct data *data, num x, num y) {
