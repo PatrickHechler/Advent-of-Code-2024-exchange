@@ -65,7 +65,6 @@ def get_results(
     total_price_2 = 0
 
     # Von allen Positionen ausgehend die dort befindlichen Flächen durchlaufen.
-    # Bereits früher verarbeitete Positionen überspringen.
     for row in range(height):
         for col in range(width):
             pos = (row, col)
