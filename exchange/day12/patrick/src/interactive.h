@@ -186,7 +186,17 @@
 #define TITLE(title) TITLE_START #title TITLE_END
 #define FRMT_TITLE TITLE(%s)
 
+#include <stddef.h>
+#include <stdio.h>
+
 void interact(const char *path);
+
+size_t skip_columns(char *buf, size_t buf_len, int s);
+
+struct coordinate {
+	off_t x;
+	off_t y;
+};
 
 #endif // INTERACTIVE
 

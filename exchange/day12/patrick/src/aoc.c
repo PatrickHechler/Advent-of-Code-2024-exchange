@@ -5,9 +5,9 @@
  *      Author: pat
  */
 
+#include "interactive.h"
 #include "aoc.h"
 #include "hash.h"
-#include "interactive.h"
 
 #include <ctype.h>
 #include <stddef.h>
@@ -276,12 +276,12 @@ struct data* copy_data(struct data *data) {
 	return result;
 }
 
-size_t line_count(struct data *data) {
-	return data->line_count;
-}
-
-size_t max_column_count(struct data *data) {
-	return data->line_length;
+void world_sizes(struct data *data, struct coordinate *min,
+		struct coordinate *max) {
+	min->x = 0;
+	min->y = 0;
+	max->x = data->line_count - 1;
+	max->y = data->line_length - 1;
 }
 
 size_t get(struct data *data, off_t x, off_t y, size_t text_size, char *buf,
@@ -293,10 +293,11 @@ size_t get(struct data *data, off_t x, off_t y, size_t text_size, char *buf,
 	size_t result = 0;
 #define maxsub(a,b) a = (a <= b ? 0 : a - b)
 	if (x < 0) {
-		size_t len = snprintf(buf, buf_len, FRMT_CURSOR_FORWARD, (int) -x);
+		int s = -x;
+		size_t len = skip_columns(buf, buf_len, s);
 		buf += len;
 		result += len;
-		text_size -= len;
+		text_size += x; // x is negative
 		maxsub(buf_len, len);
 		x = 0;
 	}

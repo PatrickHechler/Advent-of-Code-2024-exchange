@@ -35,13 +35,16 @@ static FILE *out;
 	memcpy(buf + buf_end_pos, str, sizeof(str) - 1); \
 	buf_end_pos += sizeof(str) - 1
 
+typedef struct coordinate pos;
+
 static struct data *data;
 static const char *file;
-static off_t cur_x = 0;
-static off_t cur_y = 0;
+static pos cur = { 0, 0 };
 
-static int lines = 0;
-static int columns = 0;
+static pos display_sizes = { 0, 0 };
+
+static pos max_pos = { 0, 0 };
+static pos min_pos = { 0, 0 };
 
 static size_t buf_capacity;
 static off_t buf_end_pos;
@@ -52,20 +55,27 @@ static off_t rbuf_pos;
 static off_t rbuf_end_pos;
 static char *rbuf;
 
-static void update_max_pos();
+static void update_display_size();
 static void write_buf();
 static void ensure_buf(size_t free_space);
 
+const size_t header_display_lines = 4;
+const size_t footer_display_lines = 2;
+const size_t side_columns = 2;
+
 static void show() {
-	const size_t header_lines = 4;
-	const size_t footer_lines = 2;
 	int add = snprintf(buf + buf_end_pos, buf_capacity - buf_end_pos,
 			RESET CURSOR_UP_ONE FRMT_CURSOR_FORWARD ERASE_START_OF_DISPLAY
 			CURSOR_START_OF_DISPLAY
 			"day %d part %d on file %s\n"
-			"world   (%ld lines, %ld columns)\n" //
-			"current (line %ld, col %ld)\n", columns - 1, day, part, file,
-			line_count(data), max_column_count(data), cur_y + 1, cur_x + 1);
+			"world: min: (%ld, %ld), max: (%ld, %ld)\n" //
+			"shown: min: (%ld, %ld), max: (%ld, %ld)\n", display_sizes.x - 1, //
+			day, part, file, /* line 1 */min_pos.y, min_pos.x, max_pos.y,
+			max_pos.x, /* line 2 */
+			cur.y, cur.x,
+			cur.y + display_sizes.y - 1 - header_display_lines
+					- footer_display_lines,
+			cur.x + display_sizes.x - 1 - side_columns/* line 3 */);
 	if (add > buf_capacity - buf_end_pos) {
 		ensure_buf(add);
 		show();
@@ -73,16 +83,22 @@ static void show() {
 	}
 	buf_end_pos += add;
 	addstr("\u250C");
-	for (off_t i = 1; i < columns - 1; ++i) {
+	for (off_t i = 1; i < display_sizes.x - 1; ++i) {
 		addstr("\u2500");
 	}
 	addstr("\u2510");
-	for (off_t l = 0; l < lines - header_lines - footer_lines; ++l) {
+	for (off_t l = 0;
+			l < display_sizes.y - header_display_lines - footer_display_lines;
+			++l) {
 		addstr("\u2502");
+		if (side_columns != 2) {
+			abort();
+		}
 		retry: ;
 		while (82) {
-			size_t need = get(data, cur_x, cur_y + l, columns - 2,
-					buf + buf_end_pos, buf_capacity - buf_end_pos);
+			size_t need = get(data, cur.x, cur.y + l,
+					display_sizes.x - side_columns, buf + buf_end_pos,
+					buf_capacity - buf_end_pos);
 			if (need > buf_capacity - buf_end_pos) {
 				ensure_buf(need);
 				continue;
@@ -93,7 +109,7 @@ static void show() {
 		}
 	}
 	addstr("\u2514");
-	for (off_t i = 1; i < columns - 1; ++i) {
+	for (off_t i = 1; i < display_sizes.x - 1; ++i) {
 		addstr("\u2500");
 	}
 	addstr("\u2518");
@@ -132,16 +148,21 @@ static void read_command() {
 		case 'D' - '@':
 			exit(EXIT_SUCCESS);
 		case 'w':
-			y_dec: cur_y--;
+			y_dec: if (min_pos.y < cur.y)
+				cur.y--;
 			break;
 		case 'a':
-			x_dec: cur_x--;
+			x_dec: if (min_pos.x < cur.x)
+				cur.x--;
 			break;
 		case 's':
-			y_inc: cur_y++;
+			y_inc: if (max_pos.y - display_sizes.y + header_display_lines
+					+ footer_display_lines >= cur.y)
+				cur.y++;
 			break;
 		case 'd':
-			x_inc: cur_x++;
+			x_inc: if (max_pos.x - display_sizes.x + side_columns >= cur.x)
+				cur.x++;
 			break;
 		case ':':
 		default:
@@ -169,6 +190,7 @@ static void restore_term() {
 void interact(const char *path) {
 	file = path;
 	data = read_data(path);
+	world_sizes(data, &min_pos, &max_pos);
 	printf("read_data(%s)=%p\n", path, data);
 	if (!data) {
 		fprintf(stderr, "failed to read the needed\n", path, data);
@@ -240,8 +262,9 @@ void interact(const char *path) {
 		perror("malloc");
 		exit(EXIT_FAILURE);
 	}
-	writestr(out, HIDE_CURSOR RESET);
-	update_max_pos();
+	dprintf(out, HIDE_CURSOR RESET TITLE(Advent of Code 2024 day %d part %d (%s)),
+			day, part, file);
+	update_display_size();
 	if (rbuf_pos != rbuf_end_pos) {
 		read_command();
 	}
@@ -282,7 +305,16 @@ void interact(const char *path) {
 	}
 }
 
-static void update_max_pos() {
+size_t skip_columns(char *buf, size_t buf_len, int s) {
+	if (s < sizeof(CURSOR_FORWARD(9))) {
+		memset(buf, ' ', s > buf_len ? buf_len : s);
+		return s;
+	} else {
+		return snprintf(buf, buf_len, FRMT_CURSOR_FORWARD, s);
+	}
+}
+
+static void update_display_size() {
 	writestr(out, CURSOR_SET(9999, 9999) CURSOR_GET);
 	time_t start = time(0);
 	while (113) {
@@ -340,11 +372,11 @@ static void update_max_pos() {
 			if (rbuf[rbuf_end_pos + o] != 'R' || !nc) {
 				continue;
 			}
-			if (lines > nl) {
+			if (display_sizes.y > nl) {
 				dprintf(out, FRMT_CURSOR_UP_START ERASE_END_OF_DISPLAY,
-						lines - nl);
-			} else if (lines < nl) {
-				size_t diff = nl - lines;
+						display_sizes.y - nl);
+			} else if (display_sizes.y < nl) {
+				size_t diff = nl - display_sizes.y;
 				size_t cd = diff > 128 ? 128 : diff;
 				char rbuf2[cd];
 				memset(rbuf2, '\n', cd);
@@ -357,8 +389,8 @@ static void update_max_pos() {
 					diff -= cpy;
 				}
 			}
-			lines = nl;
-			columns = nc;
+			display_sizes.y = nl;
+			display_sizes.x = nc;
 			if (r > ++o) {
 				memmove(rbuf + rbuf_end_pos + start_o, rbuf + rbuf_end_pos + o,
 						r - o);
