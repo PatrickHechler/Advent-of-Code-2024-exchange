@@ -23,6 +23,10 @@ int part = 2;
 
 typedef long num;
 #define NUMF "%ld"
+#define NUM(n) n##L
+typedef double fpnum;
+#define FPNUMF "%g"
+#define FPNUM(n) n
 
 struct pos {
 	num x;
@@ -56,16 +60,28 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 	}
 }
 
+static uint64_t add(uint64_t a, uint64_t b) {
+	uint64_t result = a + b;
+	if (a > INT64_MAX && result <= INT64_MAX) {
+		fprintf(stderr, "OVERFLOW!");
+		exit(5);
+	}
+	return result;
+}
+
 static char* solve(char *path) {
 	struct data *data = read_data(path);
 	uint64_t result = 0;
 	for (off_t i = 0; i < data->mashines_count; ++i) {
 		struct mashine *m = data->mashines + i;
-		print_mashine(stdout, m);
 		// p = a * 3 + b
 		// t.x = a * a.x + b * b.x
 		// t.y = a * a.y + b * b.y
-
+		if (part == 2) {
+			m->prize.x += NUM(10000000000000);
+			m->prize.y += NUM(10000000000000);
+		}
+//		print_mashine(stdout, m);
 		// calculate a
 		// t.y = a * a.y + b * b.y	 | - (b * b.y)
 		// t.y - b * b.y = a * a.y	 | / a.y
@@ -78,11 +94,11 @@ static char* solve(char *path) {
 		// t.x / a.x * a.y = t.y - b * b.y + b * b.x / a.x * a.y	 | - t.y
 		// t.x / a.x * a.y - t.y = - b * b.y + b * b.x / a.x * a.y	 | ()
 		// t.x / a.x * a.y - t.y = b * (b.x / a.x * a.y - b.y)		 | / (b.x / a.x * a.y - b.y)
-		double b = (double) m->prize.x / m->a.x * m->a.y - m->prize.y;
-		// (t.x / a.x * a.y - t.y) / (b.x / a.x * a.y - b.y) = b	 |
-		b /= (double) m->b.x / m->a.x * m->a.y - m->b.y;
+		fpnum b = (fpnum) m->prize.x / m->a.x * m->a.y - m->prize.y;
+		// (t.x / a.x * a.y - t.y) / (b.x / a.x * a.y - b.y) = b
+		b /= (fpnum) m->b.x / m->a.x * m->a.y - m->b.y;
 		// (t.y - b * b.y) / a.y = a
-		double a = ((double) m->prize.y - b * m->b.y) / m->a.y;
+		fpnum a = ((fpnum) m->prize.y - b * m->b.y) / m->a.y;
 		num bn = b, an = a;
 		if (b - bn > 0.5) {
 			bn++;
@@ -90,21 +106,26 @@ static char* solve(char *path) {
 		if (a - an > 0.5) {
 			an++;
 		}
-		if (m->prize.x != m->a.x * an + m->b.x * bn) {
-			printf("  is bad (%ld:%g = %ld * %g + %ld * %g)\n", m->prize.x,
-					m->a.x * a + m->b.x * b, m->a.x, a, m->b.x, b);
+		if (m->prize.x != m->a.x * an + m->b.x * bn
+				|| m->prize.y != m->a.y * an + m->b.y * bn) {
+			printf(
+					"  %ld is bad ("NUMF":"FPNUMF" = "NUMF" * "FPNUMF" + "NUMF" * "FPNUMF")\n",
+					i + 1, m->prize.x, m->a.x * a + m->b.x * b, m->a.x, a,
+					m->b.x, b);
 			continue;
 		}
 		if (an < 0 || bn < 0) {
-			printf("  is negative\n");
+			printf("  %ld is negative\n", i + 1);
 			continue;
 		}
-		printf("  is good (%ld = %ld * %ld + %ld * %ld) (prize=%ld)\n",
-				m->prize.x, m->a.x, an, m->b.x, bn, an * 3 + bn);
-		if (an > 100 || bn > 100) {
+		uint64_t add_result = add(add(add(an, an), an), bn);
+		printf(
+				"  %ld is good ("NUMF" = "NUMF" * "NUMF" + "NUMF" * "NUMF") (prize=%s)\n",
+				i + 1, m->prize.x, m->a.x, an, m->b.x, bn, u64toa(add_result));
+		if (part == 1 && (an > 100 || bn > 100)) {
 			continue;
 		}
-		result += an * 3 + bn;
+		result = add(result, add_result);
 		continue;
 	}
 	return u64toa(result);
@@ -297,9 +318,9 @@ int main(int argc, char **argv) {
 			if (argv[idx]) {
 				goto print_help;
 			}
-		} else if (!argv[idx] || argv[idx + 1]) {
+		} else if (argv[idx] && argv[idx + 1]) {
 			goto print_help;
-		} else {
+		} else if (argv[idx]) {
 			f = argv[idx];
 		}
 	}
