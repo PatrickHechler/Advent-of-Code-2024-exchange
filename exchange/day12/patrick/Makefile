@@ -27,6 +27,11 @@ SOURCE = $(PROJECT_ROOT)src/
 
 OBJS = $(BINARY)aoc.o $(BINARY)hash.o
 
+ifeq ($(INTERACTIVE),1)
+	 OBJS += $(BINARY)interactive.o
+	 CFLAGS += -DINTERACTIVE
+endif
+
 TARGET_WITH_PATH = $(BINARY)$(TARGET)
 
 all:	$(TARGET)
