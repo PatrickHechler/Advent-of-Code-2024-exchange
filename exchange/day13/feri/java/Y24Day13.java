@@ -1,9 +1,8 @@
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
 
 /**
@@ -64,13 +63,34 @@ public class Y24Day13 {
 			else {
 				double a = calcA();
 				double b = calcB();
-				double c = 3*a+b;
-				System.out.println("A: "+a+", B: "+b+", COST: "+c);
-				if ((a<0) || (b<0) || (!checkINT(a)) || (!checkINT(b))) {
-					System.out.println("INVALID");
+				DecimalFormat df = new DecimalFormat("#");
+		        df.setMaximumFractionDigits(16);
+
+		        long na = Math.round(a);
+		        long nb = Math.round(b);
+		        long nxa = Math.round(xa);
+		        long nya = Math.round(ya);
+		        long nxb = Math.round(xb);
+		        long nyb = Math.round(yb);
+		        long nxp = Math.round(xp);
+		        long nyp = Math.round(yp);
+		        
+		        if ((na<0) || (nb<0)) {
+					System.out.println("NEGATIVE");
 					return 0;
-				}
-				return Math.round(c);
+		        }
+		        
+		        if (na*nxa+nb*nxb!=nxp) {
+		        	System.out.println("x is not the expected value: "+(na*nxa+nb*nxb)+" ("+nxp+")");
+					return 0;
+		        }
+		        
+		        if (na*nya+nb*nyb!=nyp) {
+		        	System.out.println("y is not the expected value: "+(na*nya+nb*nyb)+" ("+nyp+")");
+					return 0;
+		        }
+		        
+				return 3*na+nb;
 			}
 		}
 	}
@@ -103,12 +123,37 @@ public class Y24Day13 {
 				}
 			}
 		}
-		System.out.println("TOKENS: "+tokens);    // > 24038
+		System.out.println("TOKENS: "+tokens);    
 	}
 
 
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
-	}
+		List<Machine> machines = new ArrayList<>();
+		long tokens = 0;
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line1 = scanner.nextLine().trim();
+				if (line1.isBlank()) {
+					continue;
+				}
+				String line2 = scanner.nextLine().trim();
+				String line3 = scanner.nextLine().trim();
+				int xa = Integer.parseInt(line1.replaceFirst(BUTTON_RX, "$2"));
+				int ya = Integer.parseInt(line1.replaceFirst(BUTTON_RX, "$3"));
+				int xb = Integer.parseInt(line2.replaceFirst(BUTTON_RX, "$2"));
+				int yb = Integer.parseInt(line2.replaceFirst(BUTTON_RX, "$3"));
+				int xprize = Integer.parseInt(line3.replaceFirst(PRIZE_RX, "$1"));
+				int yprize = Integer.parseInt(line3.replaceFirst(PRIZE_RX, "$2"));
+				Machine machine = new Machine(xa,ya,xb,yb,xprize+10000000000000L,yprize+10000000000000L);
+				long costs = machine.calcCost();
+				if (costs>0) {
+					tokens += costs;
+				}
+			}
+		}
+		System.out.println("TOKENS: "+tokens);    
+	}			
+
 
 
 	
@@ -120,8 +165,9 @@ public class Y24Day13 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day13/feri/input-example.txt");
-//		mainPart2("exchange/day13/feri/input.txt");
+//		mainPart2("exchange/day13/feri/input-example.txt");
+		mainPart2("exchange/day13/feri/input.txt");                // > 59721778955796
+		                                                                
 		System.out.println("---------------");
 	}
 
