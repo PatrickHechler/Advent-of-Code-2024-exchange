@@ -7,6 +7,7 @@
 
 #include "aoc.h"
 #include "hash.h"
+#include "interactive.h"
 
 #include <ctype.h>
 #include <stddef.h>
@@ -17,8 +18,11 @@
 #include <errno.h>
 #include <search.h>
 
-#define DAY 12
+int day = 12;
 int part = 2;
+#ifdef INTERACTIVE
+static int interactive = 0;
+#endif
 
 typedef int num;
 #define NUMF "%d"
@@ -176,7 +180,6 @@ static uint64_t calc_region_border(struct data *data, num x, num y) {
 		uint64_t r_result = calc_region_dir_border(data, x, y, 2);
 		uint64_t u_result = calc_region_dir_border(data, x, y, 3);
 		uint64_t d_result = calc_region_dir_border(data, x, y, 4);
-//		calc_region_border_p1(data, x, y); /* fill area with new unused char */
 		return l_result + r_result + u_result + d_result;
 	}
 	return calc_region_border_p1(data, x, y);
@@ -257,6 +260,89 @@ static struct data* parse_line(struct data *data, char *line) {
 	data->lines[data->line_count - 1] = strdup(line);
 	return data;
 }
+
+// interactive stuff
+#ifdef INTERACTIVE
+struct data* copy_data(struct data *data) {
+	struct data *result = malloc(sizeof(struct data));
+	result->lines = malloc(sizeof(char*) * data->line_count);
+	result->line_count = data->line_count;
+	result->max_line_count = data->line_count;
+	result->line_length = data->line_length;
+	for (off_t i = 0; i < data->line_count; ++i) {
+		result->lines[i] = malloc(data->line_length + 1);
+		memcpy(result->lines[i], data->lines[i], data->line_length + 1);
+	}
+	return result;
+}
+
+size_t line_count(struct data *data) {
+	return data->line_count;
+}
+
+size_t max_column_count(struct data *data) {
+	return data->line_length;
+}
+
+size_t get(struct data *data, off_t x, off_t y, size_t text_size, char *buf,
+		size_t buf_len) {
+	if (y < 0 || x + text_size < 0 || y >= data->line_count
+			|| (x > 0 && x >= data->line_length)) {
+		return snprintf(buf, buf_len, FRMT_CURSOR_FORWARD, (int) text_size);
+	}
+	size_t result = 0;
+#define maxsub(a,b) a = (a <= b ? 0 : a - b)
+	if (x < 0) {
+		size_t len = snprintf(buf, buf_len, FRMT_CURSOR_FORWARD, (int) -x);
+		buf += len;
+		result += len;
+		text_size -= len;
+		maxsub(buf_len, len);
+		x = 0;
+	}
+	int last = 256;
+	char *line = data->lines[y];
+	for (off_t i = 0; i < data->line_length && text_size;
+			++i, --text_size, ++result) {
+		char c = line[i];
+		if (c != last) {
+			last = c;
+			int r = 128, g = 128, b = 128;
+			if (c >= 'A' && c <= 'Z') {
+				if (c % 3 == 0) {
+					r = (c - '@') * 91;
+					g = (c - 'D') * 31;
+					b = (c - 'Z') * 7;
+				} else if (c % 3 == 1) {
+					g = (c - '@') * 71;
+					b = (c - 'D') * 31;
+					r = (c - 'Z') * 7;
+				} else {
+					b = (c - '@') * 71;
+					r = (c - 'D') * 31;
+					g = (c - 'Z') * 7;
+				}
+				r = 64 + (r & 127);
+				g = 64 + (g & 127);
+				b = 64 + (b & 127);
+			}
+			size_t len = snprintf(buf, buf_len, FRMT_FC_RGB, r, g, b);
+			buf += len;
+			result += len;
+			maxsub(buf_len, len);
+		}
+		if (buf_len) {
+			*(buf++) = c;
+			--buf_len;
+		}
+	}
+	if (text_size) {
+		result += snprintf(buf, buf_len, FRMT_CURSOR_FORWARD, (int) text_size);
+	}
+	return result;
+}
+
+#endif
 
 // common stuff
 
@@ -373,25 +459,48 @@ int main(int argc, char **argv) {
 	char *me = argv[0];
 	char *f = 0;
 	if (argc > 1) {
-		if (argc > 4) {
-			fprintf(stderr, "usage: %s [p1|p2] [DATA]\n", me);
+#ifdef INTERACTIVE
+		if (argc > 4)
+#else
+		if (argc > 3)
+#endif
+				{
+			print_help: ;
+			fprintf(stderr, "usage: %s"
+#ifdef INTERACTIVE
+							" [interactive]"
+#endif
+					" [p1|p2] [DATA]\n", me);
 			return 1;
 		}
 		int idx = 1;
 		if (!strcmp("help", argv[idx])) {
-			fprintf(stderr, "usage: %s [p1|p2] [DATA]\n", me);
-			return 1;
-		} else if (!strcmp("p1", argv[idx])) {
-			part = 1;
-			f = argv[idx + 1] ? argv[idx + 1] : 0;
-		} else if (!strcmp("p2", argv[idx])) {
-			part = 2;
-			f = argv[idx + 1] ? argv[idx + 1] : 0;
-		} else if (argv[idx + 1]) {
-			fprintf(stderr, "usage: %s [p1|p2] [DATA]\n", me);
-			return 1;
-		} else {
-			f = argv[idx];
+			goto print_help;
+		}
+#ifdef INTERACTIVE
+		if (!strcmp("interactive", argv[idx])) {
+			idx++;
+			interactive = 1;
+		}
+		if (idx < argc)
+#endif
+				{
+			if (!strcmp("p1", argv[idx])) {
+				part = 1;
+				idx++;
+			} else if (!strcmp("p2", argv[idx])) {
+				part = 2;
+				idx++;
+			}
+			if (f) {
+				if (argv[idx]) {
+					goto print_help;
+				}
+			} else if (!argv[idx] || argv[idx + 1]) {
+				goto print_help;
+			} else {
+				f = argv[idx];
+			}
 		}
 	}
 	if (!f) {
@@ -404,7 +513,15 @@ int main(int argc, char **argv) {
 		}
 		f = f2;
 	}
-	printf("execute now day %d part %d on file %s\n", DAY, part, f);
+#ifdef INTERACTIVE
+	if (interactive) {
+		printf("execute now day %d part %d on file %s in interactive mode\n",
+				day, part, f);
+		interact(f);
+		return EXIT_SUCCESS;
+	}
+#endif
+	printf("execute now day %d part %d on file %s\n", day, part, f);
 	clock_t start = clock();
 	char *result = solve(f);
 	clock_t end = clock();
@@ -416,5 +533,5 @@ int main(int argc, char **argv) {
 	} else {
 		puts("there is no result");
 	}
-	return 0;
+	return EXIT_SUCCESS;
 }
