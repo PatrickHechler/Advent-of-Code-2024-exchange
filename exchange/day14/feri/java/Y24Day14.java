@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
  */
 public class Y24Day14 {
 	
+	static Y24GUIOutput14 output;
 	
 	record Pos(int x, int y) {
 		public Pos add(int dx, int dy) { return new Pos(x+dx,y+dy); }
@@ -66,8 +67,9 @@ public class Y24Day14 {
 		}
 		@Override
 		public String toString() {
-			Set<Pos> positions = getRobotPositions();
 			StringBuilder result = new StringBuilder();
+			result.append("TICK "+ticks+"\n");
+			Set<Pos> positions = getRobotPositions();
 			for (int y=0; y<maxY; y++) {
 				for (int x=0; x<maxX; x++) {
 					char c = '.';
@@ -119,6 +121,28 @@ public class Y24Day14 {
 
 
 	public static void mainPart2(String inputfile, int maxX, int maxY) throws FileNotFoundException {
+		output = new Y24GUIOutput14("2024 Day 14 Part 2", true);
+		World world = new World(maxX, maxY);
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line = scanner.nextLine().trim();
+				if (line.isBlank()) {
+					continue;
+				}
+				int px = Integer.parseInt(line.replaceFirst(ROBOT_RX, "$1"));
+				int py = Integer.parseInt(line.replaceFirst(ROBOT_RX, "$2"));
+				int vx = Integer.parseInt(line.replaceFirst(ROBOT_RX, "$3"));
+				int vy = Integer.parseInt(line.replaceFirst(ROBOT_RX, "$4"));
+				world.addRobot(px, py, vx, vy);
+			}
+		}
+		output.addStep(world.toString());
+		for (int i=0; i<10000; i++) {
+			world.tick();
+			if (world.ticks%103==1) {
+				output.addStep(world.toString());    // 7623
+			}
+		}
 	}			
 
 
@@ -132,8 +156,8 @@ public class Y24Day14 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day14/feri/input-example.txt", 11, 7);
-//		mainPart2("exchange/day14/feri/input.txt", 101, 103); 
+//		mainPart2("exchange/day14/feri/input-example.txt", 11, 7);
+		mainPart2("exchange/day14/feri/input.txt", 101, 103); 
 		                                                                
 		System.out.println("---------------");
 	}
