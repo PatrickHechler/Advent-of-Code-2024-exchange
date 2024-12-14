@@ -213,26 +213,20 @@ void free_data(struct data *data) {
 	free(data);
 }
 
-static void empty_area(char *buf, off_t x, off_t y) {
+static uint64_t empty_area(char *buf, off_t x, off_t y) {
 	if (x < 0 || y < 0 || x >= x_count || y >= x_count) {
-		return;
+		return 0;
 	}
 	if (buf[x + (x_count + 1) * y] == '.') {
-		return;
-	}//10403
+		return 0;
+	} //10403
 	buf[x + (x_count + 1) * y] = '.';
-	for (int xa = 1; xa < 1; ++xa) {
-		for (int ya = 1; ya < 1; ++ya) {
-			empty_area(buf, x - xa, y);
-			empty_area(buf, x + xa, y);
-			empty_area(buf, x, y - ya);
-			empty_area(buf, x, y + ya);
-			empty_area(buf, x - xa, y - ya);
-			empty_area(buf, x - xa, y + ya);
-			empty_area(buf, x + xa, y - ya);
-			empty_area(buf, x + xa, y + ya);
-		}
-	}
+	uint64_t result = 1;
+	result += empty_area(buf, x - 1, y);
+	result += empty_area(buf, x + 1, y);
+	result += empty_area(buf, x, y - 1);
+	result += empty_area(buf, x, y + 1);
+	return result;
 }
 
 int next_data(struct data *data) {
@@ -257,8 +251,6 @@ int next_data(struct data *data) {
 		buf[(x_count + 1) * y_count] = '\0';
 	}
 	fill_buf(data, buf);
-	int first = 238;
-	int second = 239;
 	printf("buffer:\n%s\n", buf);
 	for (off_t y = 0; y < y_count; ++y) {
 		for (off_t x = 0; x < x_count; ++x) {
@@ -266,16 +258,12 @@ int next_data(struct data *data) {
 			if (c == '.') {
 				continue;
 			}
-			if (!first) {
-				second = 0;
-				break;
+			uint64_t size = empty_area(buf, x, y);
+			if (size > 100) {
+				printf("area is %s tiles large\n", u64toa(size));
+				return 0;
 			}
-			first = 0;
-			empty_area(buf, x, y);
 		}
-	}
-	if (second) {
-		return 0;
 	}
 	for (off_t i = 0; i < data->robots_count; ++i) {
 		struct robot *r = data->robots + i;
