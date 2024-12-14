@@ -9,6 +9,7 @@
 
 #include "interactive.h"
 #include "aoc.h"
+#include "hash.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,9 +38,23 @@ static FILE *out;
 
 typedef struct coordinate pos;
 
-static struct data *data;
-static const char *file;
 static pos cur = { 0, 0 };
+static const char *file;
+static struct data *data;
+static off_t world = 0;
+static struct data *last = 0;
+struct world {
+	off_t index;
+	struct data *data;
+};
+static int w_eq(const void *a, const void *b) {
+	_Static_assert(offsetof(struct world, index) == 0, "Error!");
+	return ((const struct world*) a)->index == ((const struct world*) b)->index;
+}
+static uint64_t w_h(const void *a) {
+	return ((const struct world*) a)->index;
+}
+static struct hashset worlds = { .equal = w_eq, .hash = w_h };
 
 static pos display_sizes = { 0, 0 };
 
@@ -57,7 +72,7 @@ static char *rbuf;
 
 static void update_display_size();
 static void write_buf();
-static void ensure_buf(size_t free_space);
+static int ensure_buf(size_t free_space);
 
 const size_t header_display_lines = 4;
 const size_t footer_display_lines = 2;
@@ -67,17 +82,16 @@ static void show() {
 	int add = snprintf(buf + buf_end_pos, buf_capacity - buf_end_pos,
 			RESET CURSOR_UP_ONE FRMT_CURSOR_FORWARD ERASE_START_OF_DISPLAY
 			CURSOR_START_OF_DISPLAY
-			"day %d part %d on file %s\n"
+			"day %d part %d on file %s (world %ld)\n"
 			"world: min: (%ld, %ld), max: (%ld, %ld)\n" //
 			"shown: min: (%ld, %ld), max: (%ld, %ld)\n", display_sizes.x - 1, //
-			day, part, file, /* line 1 */min_pos.y, min_pos.x, max_pos.y,
+			day, part, file, world, /* line 1 */min_pos.y, min_pos.x, max_pos.y,
 			max_pos.x, /* line 2 */
 			cur.y, cur.x,
 			cur.y + display_sizes.y - 1 - header_display_lines
 					- footer_display_lines,
 			cur.x + display_sizes.x - 1 - side_columns/* line 3 */);
-	if (add > buf_capacity - buf_end_pos) {
-		ensure_buf(add);
+	if (ensure_buf(add)) {
 		show();
 		return;
 	}
@@ -99,12 +113,21 @@ static void show() {
 			size_t need = get(data, cur.x, cur.y + l,
 					display_sizes.x - side_columns, buf + buf_end_pos,
 					buf_capacity - buf_end_pos);
-			if (need > buf_capacity - buf_end_pos) {
-				ensure_buf(need);
+			if (ensure_buf(need)) {
 				continue;
 			}
 			buf_end_pos += need;
-			addstr(RESET "\u2502");
+			break;
+		}
+		while (109) {
+			size_t need = snprintf(buf + buf_end_pos,
+					buf_capacity - buf_end_pos,
+					RESET FRMT_CURSOR_SET_COLUMN "\u2502",
+					(int) display_sizes.x);
+			if (ensure_buf(need)) {
+				continue;
+			}
+			buf_end_pos += need;
 			break;
 		}
 	}
@@ -114,6 +137,169 @@ static void show() {
 	}
 	addstr("\u2518");
 	write_buf();
+}
+
+static void* compute_world(void *param, void *val) {
+	struct world *result = malloc(sizeof(struct world));
+	result->index = world;
+	result->data = copy_data(data);
+	return result;
+}
+
+static void next_world() {
+	switch (keep) {
+	case keep_none:
+		last = 0;
+		if (next_data(data)) {
+			world++;
+		}
+		break;
+	case keep_last:
+		if (last) {
+			free_data(last);
+		}
+		last = data;
+		data = copy_data(data);
+		if (next_data(data)) {
+			world++;
+		}
+		break;
+	case keep_all10000:
+		if (last) {
+			free_data(last);
+		}
+		last = data;
+		data = copy_data(data);
+		if (next_data(data)) {
+			world++;
+			if (!(world % 10000)) {
+				hs_compute_absent(&worlds, &world, 0, compute_world);
+			}
+		}
+		break;
+	case keep_all1000:
+		if (last) {
+			free_data(last);
+		}
+		last = data;
+		data = copy_data(data);
+		if (next_data(data)) {
+			world++;
+			if (!(world % 1000)) {
+				hs_compute_absent(&worlds, &world, 0, compute_world);
+			}
+		}
+		break;
+	case keep_all100:
+		if (last) {
+			free_data(last);
+		}
+		last = data;
+		data = copy_data(data);
+		if (next_data(data)) {
+			world++;
+			if (!(world % 100)) {
+				hs_compute_absent(&worlds, &world, 0, compute_world);
+			}
+		}
+		break;
+	case keep_all10:
+		if (last) {
+			free_data(last);
+		}
+		last = data;
+		data = copy_data(data);
+		if (next_data(data)) {
+			world++;
+			if (!(world % 10)) {
+				hs_compute_absent(&worlds, &world, 0, compute_world);
+			}
+		}
+		break;
+	case keep_all:
+		if (last) {
+			free_data(last);
+		}
+		last = data;
+		data = copy_data(data);
+		if (next_data(data)) {
+			world++;
+			hs_compute_absent(&worlds, &world, 0, compute_world);
+		}
+		break;
+	}
+}
+
+void prev_world() {
+	if (!world) {
+		return;
+	}
+	world--;
+	free_data(data);
+	if (last) {
+		data = last;
+		last = 0;
+		return;
+	}
+	off_t w;
+	switch (keep) {
+	case keep_none:
+	case keep_last:
+		read_d: w = 0;
+		data = read_data(file);
+		break;
+	case keep_all10000: {
+		w = world - (world % 10000);
+		data = hs_get(&worlds, &w);
+		if (!data)
+			goto read_d;
+
+		data = copy_data(data);
+		break;
+	}
+	case keep_all1000: {
+		w = world - (world % 1000);
+		data = hs_get(&worlds, &w);
+		if (!data)
+			goto read_d;
+
+		data = copy_data(data);
+		break;
+	}
+	case keep_all100: {
+		w = world - (world % 100);
+		data = hs_get(&worlds, &w);
+		if (!data)
+			goto read_d;
+
+		data = copy_data(data);
+		break;
+	}
+	case keep_all10: {
+		w = world - (world % 10);
+		data = hs_get(&worlds, &w);
+		if (!data)
+			goto read_d;
+
+		data = copy_data(data);
+		break;
+	}
+	case keep_all:
+		w = world;
+		data = hs_get(&worlds, &w);
+		if (!data)
+			goto read_d;
+
+		data = copy_data(data);
+		break;
+	}
+	for (; w < world; ++w) {
+		dprintf(out, "\033[Gworld %ld\033[K", w);
+		if (!next_data(data)) {
+			world = w;
+			break;
+		}
+	}
 }
 
 static void read_command() {
@@ -135,6 +321,18 @@ static void read_command() {
 				case 'C':
 					pos += 2;
 					goto x_inc;
+				case '6':
+					if (rbuf[pos + 3] == '~') {
+						next_world();
+						break;
+					}
+					goto print_unknown;
+				case '5':
+					if (rbuf[pos + 3] == '~') {
+						prev_world();
+						break;
+					}
+					goto print_unknown;
 				default:
 					break;
 				}
@@ -262,11 +460,28 @@ void interact(const char *path) {
 		perror("malloc");
 		exit(EXIT_FAILURE);
 	}
-	dprintf(out, HIDE_CURSOR RESET TITLE(Advent of Code 2024 day %d part %d (%s)),
-			day, part, file);
+	dprintf(out,
+	HIDE_CURSOR RESET TITLE(Advent of Code 2024 day %d part %d (%s)), day, part,
+			file);
 	update_display_size();
 	if (rbuf_pos != rbuf_end_pos) {
 		read_command();
+	}
+	int cont = 448;
+	while (cont) {
+		show();
+#if __unix__
+//		struct timespec wait = { .tv_nsec = 10000000 /*10ms*/};
+//		nanosleep(&wait, 0);
+#endif
+//		for (int i = 10; i; --i) {
+			off_t w = world;
+			next_world();
+			if (w == world) {
+				cont = 0;
+				break;
+			}
+//		}
 	}
 	while (69) {
 		show();
@@ -401,14 +616,15 @@ static void update_display_size() {
 		rbuf_end_pos += r;
 	}
 }
-static void ensure_buf(size_t free_space) {
+static int ensure_buf(size_t free_space) {
+	int need_refill = 0;
 	while (308) {
 		if (buf_capacity - buf_end_pos >= free_space) {
-			return;
+			return need_refill;
 		}
 		if (buf_capacity >= free_space) {
 			write_buf();
-			return;
+			return 1;
 		}
 		buf = reallocarray(buf, buf_capacity, 2);
 		if (!buf) {
@@ -416,6 +632,7 @@ static void ensure_buf(size_t free_space) {
 			exit(EXIT_FAILURE);
 		}
 		buf_capacity *= 2;
+		need_refill = 1;
 	}
 }
 static void write_buf() {

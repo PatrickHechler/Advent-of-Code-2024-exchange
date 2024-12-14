@@ -201,6 +201,9 @@ struct coordinate {
 enum cache_policy {
 	keep_none,
 	keep_last,
+	keep_all10000,
+	keep_all1000,
+	keep_all100,
 	keep_all10,
 	keep_all,
 };

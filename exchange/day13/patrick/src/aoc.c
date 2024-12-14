@@ -18,7 +18,7 @@
 #include <search.h>
 #include <string.h>
 
-int day = 12;
+int day = 13;
 int part = 2;
 
 typedef long num;

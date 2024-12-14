@@ -5,9 +5,9 @@
  *      Author: pat
  */
 
+#include "interactive.h"
 #include "aoc.h"
 #include "hash.h"
-#include "interactive.h"
 
 #include <ctype.h>
 #include <stddef.h>
@@ -20,9 +20,6 @@
 
 int day = 12;
 int part = 2;
-#ifdef INTERACTIVE
-static int interactive = 0;
-#endif
 
 typedef int num;
 #define NUMF "%d"
@@ -263,6 +260,8 @@ static struct data* parse_line(struct data *data, char *line) {
 
 // interactive stuff
 #ifdef INTERACTIVE
+enum cache_policy keep = keep_all;
+
 struct data* copy_data(struct data *data) {
 	struct data *result = malloc(sizeof(struct data));
 	result->lines = malloc(sizeof(char*) * data->line_count);
@@ -276,12 +275,23 @@ struct data* copy_data(struct data *data) {
 	return result;
 }
 
-size_t line_count(struct data *data) {
-	return data->line_count;
+void free_data(struct data *data) {
+	for (off_t i = 0; i < data->line_count; ++i) {
+		free(data->lines[i]);
+	}
+	free(data);
 }
 
-size_t max_column_count(struct data *data) {
-	return data->line_length;
+int next_data(struct data *data) {
+	return 0;
+}
+
+void world_sizes(struct data *data, struct coordinate *min,
+		struct coordinate *max) {
+	min->x = 0;
+	min->y = 0;
+	max->x = data->line_count - 1;
+	max->y = data->line_length - 1;
 }
 
 size_t get(struct data *data, off_t x, off_t y, size_t text_size, char *buf,
@@ -293,10 +303,11 @@ size_t get(struct data *data, off_t x, off_t y, size_t text_size, char *buf,
 	size_t result = 0;
 #define maxsub(a,b) a = (a <= b ? 0 : a - b)
 	if (x < 0) {
-		size_t len = snprintf(buf, buf_len, FRMT_CURSOR_FORWARD, (int) -x);
+		int s = -x;
+		size_t len = skip_columns(buf, buf_len, s);
 		buf += len;
 		result += len;
-		text_size -= len;
+		text_size += x; // x is negative
 		maxsub(buf_len, len);
 		x = 0;
 	}
@@ -456,6 +467,9 @@ struct data* read_data(const char *path) {
 }
 
 int main(int argc, char **argv) {
+#ifdef INTERACTIVE
+	int interactive = 0;
+#endif
 	char *me = argv[0];
 	char *f = 0;
 	if (argc > 1) {
