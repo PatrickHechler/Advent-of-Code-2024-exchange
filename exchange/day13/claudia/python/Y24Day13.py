@@ -11,9 +11,9 @@ def loadInput(isTest = True):
     global __startTime
 
     if isTest:
-        filename = f"C:/Users/User/OneDrive/Claudia/GIT/AoC2024/Advent-of-Code-2024-exchange/exchange/day{DAY}/claudia/input-example.txt"
+        filename = f"exchange/day{DAY}/claudia/input-example.txt"
     else:
-        filename = f"C:/Users/User/OneDrive/Claudia/GIT/AoC2024/Advent-of-Code-2024-exchange/exchange/day{DAY}/claudia/input.txt"
+        filename = f"exchange/day{DAY}/claudia/input.txt"
 
     with open(filename) as f:
         content = [l[:-1] if l[-1] == "\n" else l for l in f.readlines()]
