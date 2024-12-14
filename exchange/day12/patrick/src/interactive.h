@@ -198,6 +198,13 @@ struct coordinate {
 	off_t y;
 };
 
+enum cache_policy {
+	keep_none,
+	keep_last,
+	keep_all10,
+	keep_all,
+};
+
 #endif // INTERACTIVE
 
 #endif /* SRC_INTERACTIVE_H_ */

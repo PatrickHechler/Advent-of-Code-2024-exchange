@@ -33,7 +33,11 @@ struct data* read_data(const char *path);
 #include <stddef.h>
 #include <stdio.h>
 
+extern enum cache_policy keep;
+
 struct data* copy_data(struct data*);
+void free_data(struct data*);
+int next_data(struct data*);
 void world_sizes(struct data*, struct coordinate*min, struct coordinate*max);
 size_t get(struct data*, off_t x, off_t y, size_t text_size, char*, size_t buf_len);
 #endif

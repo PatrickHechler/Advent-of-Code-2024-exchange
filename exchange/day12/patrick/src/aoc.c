@@ -20,9 +20,6 @@
 
 int day = 12;
 int part = 2;
-#ifdef INTERACTIVE
-static int interactive = 0;
-#endif
 
 typedef int num;
 #define NUMF "%d"
@@ -263,6 +260,8 @@ static struct data* parse_line(struct data *data, char *line) {
 
 // interactive stuff
 #ifdef INTERACTIVE
+enum cache_policy keep = keep_all;
+
 struct data* copy_data(struct data *data) {
 	struct data *result = malloc(sizeof(struct data));
 	result->lines = malloc(sizeof(char*) * data->line_count);
@@ -274,6 +273,17 @@ struct data* copy_data(struct data *data) {
 		memcpy(result->lines[i], data->lines[i], data->line_length + 1);
 	}
 	return result;
+}
+
+void free_data(struct data *data) {
+	for (off_t i = 0; i < data->line_count; ++i) {
+		free(data->lines[i]);
+	}
+	free(data);
+}
+
+int next_data(struct data *data) {
+	return 0;
 }
 
 void world_sizes(struct data *data, struct coordinate *min,
@@ -457,6 +467,9 @@ struct data* read_data(const char *path) {
 }
 
 int main(int argc, char **argv) {
+#ifdef INTERACTIVE
+	int interactive = 0;
+#endif
 	char *me = argv[0];
 	char *f = 0;
 	if (argc > 1) {
