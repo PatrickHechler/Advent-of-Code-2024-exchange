@@ -361,7 +361,7 @@ public class Y24Day15 {
 		System.out.println("--- PART II ---");
 //		mainPart2("exchange/day15/feri/input-example-2.txt");
 //		mainPart2("exchange/day15/feri/input-example-1.txt");
-		mainPart2("exchange/day15/feri/input.txt");  // > 1277897
+		mainPart2("exchange/day15/feri/input.txt");
 		System.out.println("---------------");
 	}
 
