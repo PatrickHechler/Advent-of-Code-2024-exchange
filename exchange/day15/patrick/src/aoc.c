@@ -61,6 +61,52 @@ static uint64_t add(uint64_t a, uint64_t b) {
 	return result;
 }
 
+int can_step_robot2(struct data *data, num x, num y, num addx, num addy) {
+	num tx = x + addx, ty = y + addy;
+	char c = data->lines[ty][tx];
+	if (addy) {
+		if (c == '[') {
+			return can_step_robot2(data, tx, ty, addx, addy)
+					&& can_step_robot2(data, tx + 1, ty, addx, addy);
+		}
+		if (c == ']') {
+			return can_step_robot2(data, tx, ty, addx, addy)
+					&& can_step_robot2(data, tx - 1, ty, addx, addy);
+		}
+	} else if (c == '[' || c == ']') {
+		return can_step_robot2(data, tx, ty, addx, addy);
+	}
+	if (c == '#') {
+		return 0;
+	}
+	if (c == '.') {
+		return 1;
+	}
+	fprintf(stderr, "ERROR");
+	exit(12);
+}
+
+void do_step_robot2(struct data *data, num x, num y, num addx, num addy) {
+	num tx = x + addx, ty = y + addy;
+	char c = data->lines[ty][tx];
+	if (addy) {
+		if (c == '[') {
+			do_step_robot2(data, tx, ty, addx, addy);
+			do_step_robot2(data, tx + 1, ty, addx, addy);
+			data->lines[ty][tx + 1] = '.';
+			data->lines[ty + addy][tx + 1] = ']';
+		} else if (c == ']') {
+			do_step_robot2(data, tx, ty, addx, addy);
+			do_step_robot2(data, tx - 1, ty, addx, addy);
+			data->lines[ty][tx - 1] = '.';
+			data->lines[ty + addy][tx - 1] = '[';
+		}
+	} else if (c == '[' || c == ']') {
+		do_step_robot2(data, tx, ty, addx, addy);
+	}
+	data->lines[ty][tx] = data->lines[y][x];
+}
+
 void step_robot(struct data *data, robot *bot, char m) {
 	num addx = 0, addy = 0;
 	switch (m) {
@@ -79,6 +125,16 @@ void step_robot(struct data *data, robot *bot, char m) {
 	default:
 		fprintf(stderr, "invalid movement %c\n", m);
 		exit(1);
+	}
+	if (part == 2) {
+		if (!can_step_robot2(data, bot->x, bot->y, addx, addy)) {
+			return;
+		}
+		do_step_robot2(data, bot->x, bot->y, addx, addy);
+		data->lines[bot->y][bot->x] = '.';
+		bot->x += addx;
+		bot->y += addy;
+		return;
 	}
 	while (100) {
 		bot->x += addx;
@@ -132,8 +188,9 @@ static char* solve(char *path) {
 		printf("move %c\n", *m);
 	}
 	print(stdout, data, result);
+	char box = part == 2 ? '[' : 'O';
 	for (num y = 0; y < data->line_count; ++y) {
-		for (char *c = strchr(data->lines[y], 'O'); c; c = strchr(c + 1, 'O')) {
+		for (char *c = strchr(data->lines[y], box); c; c = strchr(c + 1, box)) {
 			result += 100 * y + (c - data->lines[y]);
 		}
 	}
@@ -181,7 +238,39 @@ static struct data* parse_line(struct data *data, char *line) {
 			data->lines = reallocarray(data->lines, data->max_line_count <<= 1,
 					sizeof(char*));
 		}
-		data->lines[data->line_count - 1] = strdup(line);
+		if (part == 2) {
+			data->lines[data->line_count - 1] = malloc((end - line) * 2 + 1);
+			char *dst = data->lines[data->line_count - 1];
+			char *src = line;
+			while (*src) {
+				switch (*src) {
+				case '#':
+					dst[0] = '#';
+					dst[1] = '#';
+					break;
+				case '.':
+					dst[0] = '.';
+					dst[1] = '.';
+					break;
+				case 'O':
+					dst[0] = '[';
+					dst[1] = ']';
+					break;
+				case '@':
+					dst[0] = '@';
+					dst[1] = '.';
+					break;
+				default:
+					fprintf(stderr, "invalid map char: %c\n", *src);
+					exit(1);
+				}
+				src++;
+				dst += 2;
+			}
+			*dst = '\0';
+		} else {
+			data->lines[data->line_count - 1] = strdup(line);
+		}
 	}
 	return data;
 }
