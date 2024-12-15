@@ -286,14 +286,24 @@ public class Y24Day15 {
 			robotPos = nextRobotPos;
 		}
 		private boolean recursiveMoveBoxes(Set<Pos> result, Pos box2Move, char dirChar) {
+			if (result.contains(box2Move)) {
+				return true;
+			}
 			result.add(box2Move);
 			boolean ok = true;
-			if ("^v".indexOf(dirChar) != -1) {
-				Pos b1 = box2Move.move(dirChar);
-				Pos b2 = box2Move.move(dirChar);
+			Pos b1 = box2Move.move(dirChar);
+			Pos b2 = box2Move.right().move(dirChar);
+			if (isWall(b1) || isWall(b2)) {
+				return false;
 			}
-			else {
-				
+			if (isBox(b1.left())) {
+				ok = recursiveMoveBoxes(result, b1.left(), dirChar);
+			}
+			if (ok && isBox(b1)) {
+				ok = recursiveMoveBoxes(result, b1, dirChar);
+			}
+			if (ok && isBox(b2)) {
+				ok = recursiveMoveBoxes(result, b2, dirChar);
 			}
 			return ok;
 		}
@@ -347,8 +357,8 @@ public class Y24Day15 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day15/feri/input-example-2.txt");
-//		mainPart2("exchange/day15/feri/input.txt");
+//		mainPart2("exchange/day15/feri/input-example-2.txt");
+		mainPart2("exchange/day15/feri/input.txt");   > 1277897
 		System.out.println("---------------");
 	}
 
