@@ -10,10 +10,9 @@
 #ifndef SRC_COLOR_H_
 #define SRC_COLOR_H_
 
-/* basic stuff like coloring */
+#include "control.h"
 
-#define ESC_C '\033'
-#define ESC "\033"
+/* basic stuff like coloring */
 
 #define CSI ESC "["
 #define C_SEP ";"

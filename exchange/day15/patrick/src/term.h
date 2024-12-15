@@ -14,8 +14,6 @@
 
 /* more advanced stuff */
 
-#define BELL "\b"
-
 #define C_CURSOR_UP        "A"
 #define C_CURSOR_DOWN      "B"
 #define C_CURSOR_FORWARD   "C"
@@ -36,30 +34,6 @@
 #define CURSOR_PREV_LINE        CSI C_CURSOR_PREV_LINE
 #define CURSOR_START_OF_LINE    CSI C_CURSOR_SET_COLUM
 #define CURSOR_START_OF_DISPLAY CSI C_CURSOR_SET
-
-#define ERASE_END_OF_DISPLAY   CSI C_ERASE_IN_DISPLAY
-#define ERASE_START_OF_DISPLAY CSI "1" C_ERASE_IN_DISPLAY
-#define ERASE_COMPLETE_DISPLAY CSI "2" C_ERASE_IN_DISPLAY
-
-#define ERASE_END_OF_LINE   CSI C_ERASE_IN_LINE
-#define ERASE_START_OF_LINE CSI "1" C_ERASE_IN_LINE
-#define ERASE_COMPLETE_LINE CSI "2" C_ERASE_IN_LINE
-
-#define CURSOR_GET CSI "6n"
-
-#define SHOW_CURSOR CSI "?25h"
-#define HIDE_CURSOR CSI "?25l"
-
-#define C_SCROLL_PAGE_UP "S"
-#define C_SCROLL_PAGE_DOWN "S"
-
-#define SCROLL_PAGE_UP CSI "S"
-#define SCROLL_PAGE_DOWN CSI "S"
-
-#define C_END_OF_STRING ESC "\\"
-
-#define TITLE_START ESC "]0"
-#define TITLE_END   C_END_OF_STRING
 
 /* moves n steps in the given direction */
 #define CURSOR_FORWARD(count) CSI #count C_CURSOR_FORWARD
@@ -91,15 +65,39 @@
 #define CURSOR_SET_COLUMN(count) CSI #count C_CURSOR_SET_COLUM
 #define FRMT_CURSOR_SET_COLUMN CURSOR_SET_COLUMN(%u)
 
+#define CURSOR_GET CSI "6n"
+
+#define SCROLL_PAGE_UP CSI "S"
+#define SCROLL_PAGE_DOWN CSI "S"
+
 /* set the window title */
 #define SCROLL_PAGES_UP(count) CSI #count C_SCROLL_PAGE_UP
 #define SCROLL_PAGES_DOWN(count) CSI #count C_SCROLL_PAGE_DOWN
 
+#define C_SCROLL_PAGE_UP "S"
+#define C_SCROLL_PAGE_DOWN "S"
+
 #define FRMT_SCROLL_PAGE_UP SCROLL_PAGE_UP(%u)
 #define FRMT_SCROLL_PAGE_DOWN SCROLL_PAGE_DOWN(%u)
+
+#define C_END_OF_STRING ESC "\\"
+
+#define TITLE_START ESC "]0"
+#define TITLE_END   C_END_OF_STRING
 
 /* set the window title */
 #define TITLE(title) TITLE_START #title TITLE_END
 #define FRMT_TITLE TITLE(%s)
+
+#define SHOW_CURSOR CSI "?25h"
+#define HIDE_CURSOR CSI "?25l"
+
+#define ERASE_END_OF_DISPLAY   CSI C_ERASE_IN_DISPLAY
+#define ERASE_START_OF_DISPLAY CSI "1" C_ERASE_IN_DISPLAY
+#define ERASE_COMPLETE_DISPLAY CSI "2" C_ERASE_IN_DISPLAY
+
+#define ERASE_END_OF_LINE   CSI C_ERASE_IN_LINE
+#define ERASE_START_OF_LINE CSI "1" C_ERASE_IN_LINE
+#define ERASE_COMPLETE_LINE CSI "2" C_ERASE_IN_LINE
 
 #endif /* SRC_TERM_H_ */

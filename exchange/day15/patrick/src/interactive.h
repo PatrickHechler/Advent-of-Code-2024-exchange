@@ -10,9 +10,20 @@
 #ifndef SRC_INTERACTIVE_H_
 #define SRC_INTERACTIVE_H_
 
-#ifndef INTERACTIVE
 #include "color.h"
-#else
+
+#define STEP_HEADER_C SOH_C
+#define STEP_HEADER   SOH
+#define STEP_BODY_C STX_C
+#define STEP_BODY   STX
+#define STEP_FOOTER_C ETX_C
+#define STEP_FOOTER   ETX
+#define STEP_FINISHED_C EOT_C
+#define STEP_FINISHED   EOT
+#define STEP_ALL_FINISHED_C EM_C
+#define STEP_ALL_FINISHED   EM
+
+#ifdef INTERACTIVE
 #include "term.h"
 
 #include <stddef.h>
