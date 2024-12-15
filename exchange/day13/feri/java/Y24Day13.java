@@ -89,7 +89,7 @@ public class Y24Day13 {
 		        	System.out.println("y is not the expected value: "+(na*nya+nb*nyb)+" ("+nyp+")");
 					return 0;
 		        }
-		        
+	        	System.out.println("SOLUTION: "+na+"xA + "+nb+"xB");
 				return 3*na+nb;
 			}
 		}
