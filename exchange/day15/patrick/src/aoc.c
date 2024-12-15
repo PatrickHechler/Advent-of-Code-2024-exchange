@@ -4,7 +4,6 @@
  *  Created on: Dec 2, 2024
  *      Author: pat
  */
-
 #include "interactive.h"
 #include "aoc.h"
 #include "hash.h"
@@ -19,7 +18,7 @@
 #include <search.h>
 #include <string.h>
 
-int day = 14;
+int day = 15;
 int part = 2;
 
 typedef long num;
@@ -29,54 +28,28 @@ typedef double fpnum;
 #define FPNUMF "%g"
 #define FPNUM(n) n
 
-struct pos {
+typedef struct pos {
 	num x;
 	num y;
-};
+} pos;
 
-struct robot {
-	struct pos pos;
-	struct pos vec;
-};
+typedef pos robot;
 
 struct data {
-	struct robot *robots;
-	size_t robots_count;
-	size_t max_robots_count;
-	struct robot *orig_robots;
+	char **lines;
+	num line_length;
+	num line_count;
+	size_t max_line_count;
+	char *movements;
+	size_t movements_count;
+	size_t max_movements_count;
 };
-
-static size_t x_count, y_count;
-
-void print_robot(FILE *str, struct robot *r) {
-	fprintf(str, "p="NUMF","NUMF"  \tv="NUMF","NUMF"\n", r->pos.x, r->pos.y,
-			r->vec.x, r->vec.y);
-}
-
-static void fill_buf(struct data *data, char *buf) {
-	memset(buf, '.', (x_count + 1) * y_count);
-	for (off_t y = 1; y <= y_count; ++y) {
-		buf[(x_count + 1) * y - 1] = '\n';
-	}
-	for (off_t l = 0; l < data->robots_count; ++l) {
-		struct robot *r = data->robots + l;
-		if (++buf[r->pos.x + (x_count + 1) * r->pos.y] == '.' + 1) {
-			buf[r->pos.x + (x_count + 1) * r->pos.y] = '1';
-		} else if (buf[r->pos.x + (x_count + 1) * r->pos.y] > '9') {
-			buf[r->pos.x + (x_count + 1) * r->pos.y] = '9' + 1;
-		}
-	}
-}
 
 static void print(FILE *str, struct data *data, uint64_t result) {
 	fprintf(str, "result=%s\n", u64toa(result));
-	static char *buf = 0;
-	if (!buf) {
-		buf = malloc((x_count + 1) * y_count + 1);
-		buf[(x_count + 1) * y_count] = '\0';
+	for (int l = 0; l < data->line_count; ++l) {
+		fprintf(str, "%s\n", data->lines[l]);
 	}
-	fill_buf(data, buf);
-	fputs(buf, str);
 }
 
 static uint64_t add(uint64_t a, uint64_t b) {
@@ -88,88 +61,139 @@ static uint64_t add(uint64_t a, uint64_t b) {
 	return result;
 }
 
-static uint64_t empty_area(char *buf, off_t x, off_t y) {
-	if (x < 0 || y < 0 || x >= x_count || y >= x_count) {
+int can_step_robot2(struct data *data, num x, num y, num addx, num addy) {
+	num tx = x + addx, ty = y + addy;
+	char c = data->lines[ty][tx];
+	if (addy) {
+		if (c == '[') {
+			return can_step_robot2(data, tx, ty, addx, addy)
+					&& can_step_robot2(data, tx + 1, ty, addx, addy);
+		}
+		if (c == ']') {
+			return can_step_robot2(data, tx, ty, addx, addy)
+					&& can_step_robot2(data, tx - 1, ty, addx, addy);
+		}
+	} else if (c == '[' || c == ']') {
+		return can_step_robot2(data, tx, ty, addx, addy);
+	}
+	if (c == '#') {
 		return 0;
 	}
-	if (buf[x + (x_count + 1) * y] == '.') {
-		return 0;
-	} //10403
-	buf[x + (x_count + 1) * y] = '.';
-	uint64_t result = 1;
-	result += empty_area(buf, x - 1, y);
-	result += empty_area(buf, x + 1, y);
-	result += empty_area(buf, x, y - 1);
-	result += empty_area(buf, x, y + 1);
-	return result;
+	if (c == '.') {
+		return 1;
+	}
+	fprintf(stderr, "ERROR");
+	exit(12);
 }
 
-static int has_next_world(struct data *data) {
-	static char *buf = 0;
-	static size_t lxc = 0;
-	static size_t lyc = 0;
-	if (lxc != x_count || lyc != y_count) {
-		if (buf) {
-			free(buf);
+void do_step_robot2(struct data *data, num x, num y, num addx, num addy) {
+	num tx = x + addx, ty = y + addy;
+	char c = data->lines[ty][tx];
+	if (addy) {
+		if (c == '[') {
+			do_step_robot2(data, tx, ty, addx, addy);
+			do_step_robot2(data, tx + 1, ty, addx, addy);
+			data->lines[ty][tx + 1] = '.';
+			data->lines[ty + addy][tx + 1] = ']';
+		} else if (c == ']') {
+			do_step_robot2(data, tx, ty, addx, addy);
+			do_step_robot2(data, tx - 1, ty, addx, addy);
+			data->lines[ty][tx - 1] = '.';
+			data->lines[ty + addy][tx - 1] = '[';
 		}
-		lxc = x_count;
-		lyc = y_count;
-		buf = malloc((x_count + 1) * y_count + 1);
-		buf[(x_count + 1) * y_count] = '\0';
+	} else if (c == '[' || c == ']') {
+		do_step_robot2(data, tx, ty, addx, addy);
 	}
-	fill_buf(data, buf);
-//	printf("buffer:\n%s\n", buf);
-	for (off_t y = 0; y < y_count; ++y) {
-		for (off_t x = 0; x < x_count; ++x) {
-			char c = buf[x + (x_count + 1) * y];
-			if (c == '.') {
-				continue;
+	data->lines[ty][tx] = data->lines[y][x];
+}
+
+void step_robot(struct data *data, robot *bot, char m) {
+	num addx = 0, addy = 0;
+	switch (m) {
+	case '^':
+		addy = -1;
+		break;
+	case 'v':
+		addy = 1;
+		break;
+	case '<':
+		addx = -1;
+		break;
+	case '>':
+		addx = 1;
+		break;
+	default:
+		fprintf(stderr, "invalid movement %c\n", m);
+		exit(1);
+	}
+	if (part == 2) {
+		if (!can_step_robot2(data, bot->x, bot->y, addx, addy)) {
+			return;
+		}
+		do_step_robot2(data, bot->x, bot->y, addx, addy);
+		data->lines[bot->y][bot->x] = '.';
+		bot->x += addx;
+		bot->y += addy;
+		return;
+	}
+	while (100) {
+		bot->x += addx;
+		bot->y += addy;
+		char t = data->lines[bot->y][bot->x];
+		if (t == '.') {
+			while (105) {
+				char move = data->lines[bot->y - addy][bot->x - addx];
+				data->lines[bot->y][bot->x] = move;
+				if (move == '@') {
+					data->lines[bot->y - addy][bot->x - addx] = '.';
+					break;
+				}
+				bot->x -= addx;
+				bot->y -= addy;
 			}
-			uint64_t size = empty_area(buf, x, y);
-			if (size > 100) {
-				printf("area is %s tiles large\n", u64toa(size));
-				return 0;
+			break;
+		} else if (t == '#') {
+			while (data->lines[bot->y][bot->x] != '@') {
+				bot->x -= addx;
+				bot->y -= addy;
 			}
+			break;
+		} else if (t != 'O') {
+			fprintf(stderr, "invalid character in map %c\n", t);
+			exit(1);
 		}
 	}
-	return 1;
 }
 
 static char* solve(char *path) {
 	struct data *data = read_data(path);
 	uint64_t result = 0;
-	for (uint64_t tick = 0; part == 2 || tick < 100; ++tick) {
-		print(stdout, data, result);
-		for (off_t i = 0; i < data->robots_count; ++i) {
-			struct robot *r = data->robots + i;
-			r->pos.x = (r->pos.x + r->vec.x + x_count) % x_count;
-			r->pos.y = (r->pos.y + r->vec.y + y_count) % y_count;
+	robot bot = { 0, 0 };
+	for (num y = 0; y < data->line_count; ++y) {
+		char *c = strchr(data->lines[y], '@');
+		if (!c) {
+			continue;
 		}
-		if (part == 2 && !has_next_world(data)) {
-			return u64toa(tick);
-		}
+		bot.x = c - data->lines[y];
+		bot.y = y;
+		break;
 	}
-	uint64_t top_left = 0, top_right = 0, bottom_left = 0, bottom_right = 0;
-	for (off_t i = 0; i < data->robots_count; ++i) {
-		struct robot *r = data->robots + i;
-		if (r->pos.x > x_count / 2) { // right
-			if (r->pos.y > y_count / 2) { // top
-				top_right++;
-			} else if (r->pos.y < y_count / 2) { // bottom
-				bottom_right++;
-			}
-		} else if (r->pos.x < x_count / 2) { // left
-			if (r->pos.y > y_count / 2) { // top
-				top_left++;
-			} else if (r->pos.y < y_count / 2) { // bottom
-				bottom_left++;
-			}
-		}
+	if (!bot.x) {
+		fprintf(stderr, "bot not found!\n");
+		exit(1);
 	}
-	result = top_left * top_right * bottom_left * bottom_right;
+	for (char *m = data->movements; *m; ++m) {
+//		print(stdout, data, result);
+		step_robot(data, &bot, *m);
+		printf("move %c\n", *m);
+	}
 	print(stdout, data, result);
-	printf("tl=%lu tr=%lu bl=%lu br=%lu\n", top_left, top_right, bottom_left,
-			bottom_right);
+	char box = part == 2 ? '[' : 'O';
+	for (num y = 0; y < data->line_count; ++y) {
+		for (char *c = strchr(data->lines[y], box); c; c = strchr(c + 1, box)) {
+			result += 100 * y + (c - data->lines[y]);
+		}
+	}
 	return u64toa(result);
 }
 
@@ -179,57 +203,74 @@ static struct data* parse_line(struct data *data, char *line) {
 	if (!*line) {
 		return data;
 	}
+	char *end = line + strlen(line);
+	while (isspace(*--end))
+		;
+	end++;
+	*end = '\0';
 	if (!data) {
 		data = malloc(sizeof(struct data));
-		data->robots = malloc(sizeof(struct robot) * 16);
-		data->robots_count = 0;
-		data->max_robots_count = 16;
-		data->orig_robots = 0;
+		data->lines = malloc(sizeof(char*) * 16);
+		data->line_count = 0;
+		data->max_line_count = 16;
+		data->line_length = end - line;
+		data->movements = 0;
+		data->movements_count = 0;
+		data->max_movements_count = 0;
 	}
-	char assign;
-	if (line[0] != 'p' || line[1] != '=') {
-		inval: fprintf(stderr, "invalid line: %s", line);
-		abort();
-	}
-	char *ptr;
-	if (++data->robots_count > data->max_robots_count) {
-		data->robots = reallocarray(data->robots, data->max_robots_count <<= 1,
-				sizeof(struct robot));
-	}
-	struct robot *r = data->robots + data->robots_count - 1;
-	r->pos.x = strtol(line + 2, &ptr, 10);
-	if (errno) {
-		perror("strtol");
-		goto inval;
-	}
-	if (*ptr != ',') {
-		goto inval;
-	}
-	r->pos.y = strtol(ptr + 1, &ptr, 10);
-	if (errno) {
-		perror("strtol");
-		goto inval;
-	}
-	if (ptr[0] != ' ' || ptr[1] != 'v' || ptr[2] != '=') {
-		goto inval;
-	}
-	r->vec.x = strtol(ptr + 3, &ptr, 10);
-	if (errno) {
-		perror("strtol");
-		goto inval;
-	}
-	if (*ptr != ',') {
-		goto inval;
-	}
-	r->vec.y = strtol(ptr + 1, &ptr, 10);
-	if (errno) {
-		perror("strtol");
-		goto inval;
-	}
-	while (*ptr && isspace(*ptr))
-		ptr++;
-	if (*ptr) {
-		goto inval;
+	if (*line != '#' || data->line_length != end - line
+			|| data->max_movements_count) {
+		size_t old_mc = data->movements_count;
+		if (!data->max_movements_count) {
+			data->movements = malloc(sizeof(char*) * 128);
+			data->movements_count = 0;
+			data->max_movements_count = 16;
+		}
+		data->movements_count += end - line;
+		while (data->movements_count >= data->max_movements_count) {
+			data->movements = reallocarray(data->movements,
+					data->max_movements_count <<= 1, sizeof(char*));
+		}
+		memcpy(data->movements + old_mc, line, end - line);
+		data->movements[data->movements_count] = 0;
+	} else {
+		if (++data->line_count > data->max_line_count) {
+			data->lines = reallocarray(data->lines, data->max_line_count <<= 1,
+					sizeof(char*));
+		}
+		if (part == 2) {
+			data->lines[data->line_count - 1] = malloc((end - line) * 2 + 1);
+			char *dst = data->lines[data->line_count - 1];
+			char *src = line;
+			while (*src) {
+				switch (*src) {
+				case '#':
+					dst[0] = '#';
+					dst[1] = '#';
+					break;
+				case '.':
+					dst[0] = '.';
+					dst[1] = '.';
+					break;
+				case 'O':
+					dst[0] = '[';
+					dst[1] = ']';
+					break;
+				case '@':
+					dst[0] = '@';
+					dst[1] = '.';
+					break;
+				default:
+					fprintf(stderr, "invalid map char: %c\n", *src);
+					exit(1);
+				}
+				src++;
+				dst += 2;
+			}
+			*dst = '\0';
+		} else {
+			data->lines[data->line_count - 1] = strdup(line);
+		}
 	}
 	return data;
 }
@@ -437,13 +478,6 @@ char* d64toa(int64_t value) {
 }
 
 struct data* read_data(const char *path) {
-	if (strcmp(path, "rsrc/data.txt")) {
-		x_count = 11;
-		y_count = 7;
-	} else {
-		x_count = 101;
-		y_count = 103;
-	}
 	char *line_buf = 0;
 	size_t line_len = 0;
 	struct data *result = 0;
@@ -490,7 +524,7 @@ int main(int argc, char **argv) {
 #ifdef INTERACTIVE
 							" [interactive]"
 #endif
-					" [p1|p2] [DATA]\n", me);
+							" [p1|p2] [DATA]\n", me);
 			return 1;
 		}
 		int idx = 1;
@@ -504,7 +538,7 @@ int main(int argc, char **argv) {
 		}
 		if (idx < argc)
 #endif
-				{
+		{
 			if (!strcmp("p1", argv[idx])) {
 				part = 1;
 				idx++;
@@ -512,14 +546,11 @@ int main(int argc, char **argv) {
 				part = 2;
 				idx++;
 			}
-			if (f) {
-				if (argv[idx]) {
-					goto print_help;
-				}
-			} else if (!argv[idx] || argv[idx + 1]) {
-				goto print_help;
-			} else {
+			if (!f && argv[idx]) {
 				f = argv[idx];
+			}
+			if (f && argv[idx]) {
+				goto print_help;
 			}
 		}
 	}
