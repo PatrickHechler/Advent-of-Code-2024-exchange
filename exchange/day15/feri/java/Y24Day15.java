@@ -191,20 +191,32 @@ public class Y24Day15 {
 			ticks = 0;
 		}
 		public void addRow(String rowString) {
+			char[] newRow = new char[rowString.length()*2];
 			int y = rows.size();
-			char[] row = rowString.toCharArray();
-			for (int x=0; x<row.length; x++) {
-				if (row[x] == 'O') {
-					boxPositions.add(new Pos(x,y));
-					row[x] = '.';
-				}
-				if (row[x] == '@') {
-					robotPos = new Pos(x,y);
-					row[x] = '.';
+			for (int x=0; x<rowString.length(); x++) {
+				char c = rowString.charAt(x);
+				switch (c) {
+				case '#':
+				case '.':
+					newRow[2*x] = c;
+					newRow[2*x+1] = c;
+					break;
+				case '@':
+					newRow[2*x] = '.';
+					newRow[2*x+1] = '.';
+					robotPos = new Pos(2*x,y);
+					break;
+				case 'O':
+					newRow[2*x] = '.';
+					newRow[2*x+1] = '.';
+					boxPositions.add(new Pos(2*x,y));
+					break;
+				default:
+					throw new RuntimeException("unexpected char '"+c+"'");
 				}
 			}
-			rows.add(row);
-			maxX = row.length;
+			rows.add(newRow);
+			maxX = newRow.length;
 			maxY = rows.size();
 		}
 		public void addProgram(String prog) {
@@ -236,7 +248,10 @@ public class Y24Day15 {
 						c = '@';
 					}
 					else if (boxPositions.contains(p)) {
-						c = 'O';
+						c = '[';
+					}
+					else if (boxPositions.contains(p.left())) {
+						c = ']';
 					}
 					result.append(c);
 				}
@@ -254,20 +269,33 @@ public class Y24Day15 {
 			if (isWall(nextRobotPos)) {
 				return;
 			}
-			if (isBox(nextRobotPos)) {
-				Pos boxToMove = nextRobotPos;
-				Pos nextBoxToMove = boxToMove;
-				while (isBox(nextBoxToMove)) {
-					boxToMove = nextBoxToMove;
-					nextBoxToMove = nextBoxToMove.move(dirChar);
+			if (isBox(nextRobotPos) || isBox(nextRobotPos.left())) {
+				Pos box2Move = nextRobotPos;
+				if (!isBox(nextRobotPos)) {
+					box2Move = nextRobotPos.left();
 				}
-				if (isWall(nextBoxToMove)) {
+				Set<Pos> boxes2Move = new HashSet<>();
+				if (!recursiveMoveBoxes(boxes2Move, box2Move, dirChar)) {
 					return;
 				}
-				boxPositions.remove(nextRobotPos);
-				boxPositions.add(nextBoxToMove);
+				for (Pos box:boxes2Move) {
+					boxPositions.remove(box);
+					boxPositions.add(box.move(dirChar));
+				}
 			}
 			robotPos = nextRobotPos;
+		}
+		private boolean recursiveMoveBoxes(Set<Pos> result, Pos box2Move, char dirChar) {
+			result.add(box2Move);
+			boolean ok = true;
+			if ("^v".indexOf(dirChar) != -1) {
+				Pos b1 = box2Move.move(dirChar);
+				Pos b2 = box2Move.move(dirChar);
+			}
+			else {
+				
+			}
+			return ok;
 		}
 		private boolean isBox(Pos p) {
 			return boxPositions.contains(p);
@@ -288,7 +316,7 @@ public class Y24Day15 {
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
 
 		output = new Y24GUIOutput15("2024 Day 15 Part 2", true);
-		World world = new World();
+		World2 world = new World2();
 		try (Scanner scanner = new Scanner(new File(inputfile))) {
 			while (scanner.hasNext()) {
 				String line = scanner.nextLine().trim();
@@ -315,7 +343,7 @@ public class Y24Day15 {
 	public static void main(String[] args) throws FileNotFoundException {
 		System.out.println("--- PART I  ---");
 //		mainPart1("exchange/day15/feri/input-example.txt");
-		mainPart1("exchange/day15/feri/input.txt");     
+//		mainPart1("exchange/day15/feri/input.txt");     
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
