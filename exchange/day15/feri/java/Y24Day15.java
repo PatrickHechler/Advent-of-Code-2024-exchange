@@ -178,6 +178,7 @@ public class Y24Day15 {
 		int maxY;
 		private Pos robotPos;
 		private Set<Pos> boxPositions;
+		private Set<Pos> movedBoxes;
 		private String program;
 		private int ticks;
 		
@@ -185,6 +186,7 @@ public class Y24Day15 {
 			rows = new ArrayList<>();
 			robotPos = null;
 			boxPositions = new HashSet<>();
+			movedBoxes = new HashSet<>();
 			maxX = 0;
 			maxY = 0;
 			program = "";
@@ -233,6 +235,7 @@ public class Y24Day15 {
 		}
 		@Override
 		public String toString() {
+			String lastColor = "b0";
 			StringBuilder result = new StringBuilder();
 			result.append("TICK "+ticks+", SHAPE ("+maxX+","+maxY+")\n");
 			String prog = "   "+program+"          ";
@@ -241,17 +244,27 @@ public class Y24Day15 {
 				.append(prog.substring(ticks+4, ticks+13)).append("\n");
 			
 			for (int y=0; y<maxY; y++) {
+				String color="b0";
 				for (int x=0; x<maxX; x++) {
 					Pos p = new Pos(x,y);
 					char c = get(p);
+					color = "b0";
+					if (movedBoxes.contains(p) || movedBoxes.contains(p.left()) ) {
+						color = "b2";
+					}
 					if (p.equals(robotPos)) {
 						c = '@';
+						color="b1";
 					}
 					else if (boxPositions.contains(p)) {
 						c = '[';
 					}
 					else if (boxPositions.contains(p.left())) {
 						c = ']';
+					}
+					if (!color.equals(lastColor)) {
+						result.append(output.style(color));
+						lastColor = color;
 					}
 					result.append(c);
 				}
@@ -263,6 +276,7 @@ public class Y24Day15 {
 			return ticks < program.length();
 		}
 		public void tick() {
+			// movedBoxes.clear();
 			char dirChar = program.charAt(ticks);
 			ticks++;
 			Pos nextRobotPos = robotPos.move(dirChar);
@@ -281,8 +295,10 @@ public class Y24Day15 {
 				for (Pos box:boxes2Move) {
 					boxPositions.remove(box);
 				}
+				movedBoxes.clear();
 				for (Pos box:boxes2Move) {
 					boxPositions.add(box.move(dirChar));
+					movedBoxes.add(box.move(dirChar));
 				}
 			}
 			robotPos = nextRobotPos;
@@ -361,7 +377,7 @@ public class Y24Day15 {
 		System.out.println("--- PART II ---");
 //		mainPart2("exchange/day15/feri/input-example-2.txt");
 //		mainPart2("exchange/day15/feri/input-example-1.txt");
-		mainPart2("exchange/day15/feri/input.txt");  // > 1277897
+		mainPart2("exchange/day15/feri/input.txt");
 		System.out.println("---------------");
 	}
 
