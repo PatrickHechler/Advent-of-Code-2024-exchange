@@ -263,6 +263,9 @@ public class Y24Day15 {
 			return ticks < program.length();
 		}
 		public void tick() {
+			if (ticks==190) {
+				System.out.println("break");
+			}
 			char dirChar = program.charAt(ticks);
 			ticks++;
 			Pos nextRobotPos = robotPos.move(dirChar);
@@ -355,7 +358,7 @@ public class Y24Day15 {
 	public static void main(String[] args) throws FileNotFoundException {
 		System.out.println("--- PART I  ---");
 //		mainPart1("exchange/day15/feri/input-example.txt");
-		mainPart1("exchange/day15/feri/input.txt");     
+//		mainPart1("exchange/day15/feri/input.txt");     
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
