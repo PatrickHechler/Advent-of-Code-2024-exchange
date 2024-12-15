@@ -88,21 +88,65 @@ static uint64_t add(uint64_t a, uint64_t b) {
 	return result;
 }
 
-static char* solve(char *path) {
-	if (part == 2) {
-		int main(int argc, char **argv);
-		char *argv[4] = { "progname", "interactive", path, NULL };
-		int e = main(3, argv);
-		exit(e);
+static uint64_t empty_area(char *buf, off_t x, off_t y) {
+	if (x < 0 || y < 0 || x >= x_count || y >= x_count) {
+		return 0;
 	}
+	if (buf[x + (x_count + 1) * y] == '.') {
+		return 0;
+	} //10403
+	buf[x + (x_count + 1) * y] = '.';
+	uint64_t result = 1;
+	result += empty_area(buf, x - 1, y);
+	result += empty_area(buf, x + 1, y);
+	result += empty_area(buf, x, y - 1);
+	result += empty_area(buf, x, y + 1);
+	return result;
+}
+
+static int has_next_world(struct data *data) {
+	static char *buf = 0;
+	static size_t lxc = 0;
+	static size_t lyc = 0;
+	if (lxc != x_count || lyc != y_count) {
+		if (buf) {
+			free(buf);
+		}
+		lxc = x_count;
+		lyc = y_count;
+		buf = malloc((x_count + 1) * y_count + 1);
+		buf[(x_count + 1) * y_count] = '\0';
+	}
+	fill_buf(data, buf);
+//	printf("buffer:\n%s\n", buf);
+	for (off_t y = 0; y < y_count; ++y) {
+		for (off_t x = 0; x < x_count; ++x) {
+			char c = buf[x + (x_count + 1) * y];
+			if (c == '.') {
+				continue;
+			}
+			uint64_t size = empty_area(buf, x, y);
+			if (size > 100) {
+				printf("area is %s tiles large\n", u64toa(size));
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+static char* solve(char *path) {
 	struct data *data = read_data(path);
 	uint64_t result = 0;
-	for (int tick = 0; tick < 100; ++tick) {
+	for (uint64_t tick = 0; part == 2 || tick < 100; ++tick) {
 		print(stdout, data, result);
 		for (off_t i = 0; i < data->robots_count; ++i) {
 			struct robot *r = data->robots + i;
 			r->pos.x = (r->pos.x + r->vec.x + x_count) % x_count;
 			r->pos.y = (r->pos.y + r->vec.y + y_count) % y_count;
+		}
+		if (part == 2 && !has_next_world(data)) {
+			return u64toa(tick);
 		}
 	}
 	uint64_t top_left = 0, top_right = 0, bottom_left = 0, bottom_right = 0;
@@ -213,22 +257,6 @@ void free_data(struct data *data) {
 	free(data);
 }
 
-static uint64_t empty_area(char *buf, off_t x, off_t y) {
-	if (x < 0 || y < 0 || x >= x_count || y >= x_count) {
-		return 0;
-	}
-	if (buf[x + (x_count + 1) * y] == '.') {
-		return 0;
-	} //10403
-	buf[x + (x_count + 1) * y] = '.';
-	uint64_t result = 1;
-	result += empty_area(buf, x - 1, y);
-	result += empty_area(buf, x + 1, y);
-	result += empty_area(buf, x, y - 1);
-	result += empty_area(buf, x, y + 1);
-	return result;
-}
-
 int next_data(struct data *data) {
 	if (!data->orig_robots) {
 		data->orig_robots = malloc(sizeof(struct robot) * data->robots_count);
@@ -238,32 +266,8 @@ int next_data(struct data *data) {
 			sizeof(struct robot) * data->robots_count)) {
 		return 0;
 	}
-	static char *buf = 0;
-	static size_t lxc = 0;
-	static size_t lyc = 0;
-	if (lxc != x_count || lyc != y_count) {
-		if (buf) {
-			free(buf);
-		}
-		lxc = x_count;
-		lyc = y_count;
-		buf = malloc((x_count + 1) * y_count + 1);
-		buf[(x_count + 1) * y_count] = '\0';
-	}
-	fill_buf(data, buf);
-	printf("buffer:\n%s\n", buf);
-	for (off_t y = 0; y < y_count; ++y) {
-		for (off_t x = 0; x < x_count; ++x) {
-			char c = buf[x + (x_count + 1) * y];
-			if (c == '.') {
-				continue;
-			}
-			uint64_t size = empty_area(buf, x, y);
-			if (size > 100) {
-				printf("area is %s tiles large\n", u64toa(size));
-				return 0;
-			}
-		}
+	if (!has_next_world(data)) {
+		return 0;
 	}
 	for (off_t i = 0; i < data->robots_count; ++i) {
 		struct robot *r = data->robots + i;

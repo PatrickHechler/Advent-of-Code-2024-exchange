@@ -250,7 +250,7 @@ void* hs_set(struct hashset *hs, void *val) {
 		hs->data[15 & hs->hash(val)].value = val;
 		return 0;
 	}
-	if (hs->entry_count < (hs->data_size >> 2) && (hs->data_size << 1)) {
+	if (hs->entry_count > (hs->data_size >> 2) && (hs->data_size << 1)) {
 		size_t ns = hs->data_size << 1;
 		union hs_entry *new_data = calloc(ns, sizeof(union hs_entry));
 		if (new_data) {
@@ -326,7 +326,7 @@ void* hs_add(struct hashset *hs, void *val) {
 		hs->data[15 & hs->hash(val)].value = val;
 		return 0;
 	}
-	if (hs->entry_count < (hs->data_size >> 2) && (hs->data_size << 1)) {
+	if (hs->entry_count > (hs->data_size >> 2) && (hs->data_size << 1)) {
 		size_t ns = hs->data_size << 1;
 		union hs_entry *new_data = calloc(ns, sizeof(union hs_entry));
 		struct ra arg = { new_data, ns - 1, hs->hash };
