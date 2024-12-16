@@ -2,10 +2,12 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Scanner;
+import java.util.Set;
 
 /**
  * see: https://adventofcode.com/2024/day/16
@@ -94,6 +96,9 @@ public class Y24Day16 {
 					if (distances.containsKey(new PosDir(new Pos(x,y), DIR_EW)) || distances.containsKey(new PosDir(new Pos(x,y), DIR_NS))) {
 						color = "b2";
 					}
+					if (bestSeats.contains(new Pos(x,y))) {
+						color = "b3";
+					}
 					char c = get(x,y);
 					if (startPos.eq(x,y)) {
 						c = 'S';
@@ -150,15 +155,49 @@ public class Y24Day16 {
 					addEntry(new PosDir(e.posDir.pos.up(), DIR_NS), e.dist+1);
 					addEntry(new PosDir(e.posDir.pos.down(), DIR_NS), e.dist+1);
 				}
-				output.addStep(toString());
+//				output.addStep(toString());
 			}
-			
+		}
+		Set<Pos> bestSeats = new HashSet<>();
+		public int calcBestSeats() {
+			bestSeats = new HashSet<>();
+			int dist = calcShortestPath();
+			Set<PosDir> currentSeats = new HashSet<>();
+			addBestSeat(currentSeats, new PosDir(endPos, DIR_EW), dist);
+			addBestSeat(currentSeats, new PosDir(endPos, DIR_NS), dist);
+			while (!currentSeats.isEmpty()) {
+				Set<PosDir> nextSeats = new HashSet<>();
+				for (PosDir posDir:currentSeats) {
+					bestSeats.add(posDir.pos);
+					dist = distances.get(posDir);
+					if (posDir.dir == DIR_EW) {
+						addBestSeat(nextSeats, new PosDir(posDir.pos, DIR_NS), dist-1000);
+						addBestSeat(nextSeats, new PosDir(posDir.pos.left(), DIR_EW), dist-1);
+						addBestSeat(nextSeats, new PosDir(posDir.pos.right(), DIR_EW), dist-1);
+					}
+					else {
+						addBestSeat(nextSeats, new PosDir(posDir.pos, DIR_EW), dist-1000);
+						addBestSeat(nextSeats, new PosDir(posDir.pos.up(), DIR_NS), dist-1);
+						addBestSeat(nextSeats, new PosDir(posDir.pos.down(), DIR_NS), dist-1);
+					}
+//					output.addStep(toString());
+				}
+				currentSeats = nextSeats;
+			}
+			return bestSeats.size();
+		}
+		private void addBestSeat(Set<PosDir> nextSeats, PosDir posDir, int dist) {
+			if (distances.containsKey(posDir)) {
+				if (distances.get(posDir) == dist) {
+					nextSeats.add(posDir);
+				}
+			}
 		}
 	}
 
 	public static void mainPart1(String inputfile) throws FileNotFoundException {
 
-		output = new Y24GUIOutput16("2024 Day 16 Part 1", true);
+//		output = new Y24GUIOutput16("2024 Day 16 Part 1", true);
 		World world = new World();
 		try (Scanner scanner = new Scanner(new File(inputfile))) {
 			while (scanner.hasNext()) {
@@ -169,13 +208,24 @@ public class Y24Day16 {
 				world.addRow(line);
 			}
 		}
-		output.addStep(world.toString());
 		System.out.println(world.calcShortestPath());
 	}
 
 
 
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
+//		output = new Y24GUIOutput16("2024 Day 16 Part 2", true);
+		World world = new World();
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line = scanner.nextLine().trim();
+				if (line.isBlank()) {
+					break;
+				}
+				world.addRow(line);
+			}
+		}
+		System.out.println(world.calcBestSeats());
 	}
 
 
@@ -184,12 +234,12 @@ public class Y24Day16 {
 		System.out.println("--- PART I  ---");
 //		mainPart1("exchange/day16/feri/input-example.txt");
 //		mainPart1("exchange/day16/feri/input-example-2.txt");
-		mainPart1("exchange/day16/feri/input.txt");             // < 313196
+		mainPart1("exchange/day16/feri/input.txt");
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day16/feri/input-example-2.txt");
-//		mainPart2("exchange/day16/feri/input.txt");
+//		mainPart2("exchange/day16/feri/input-example-2.txt");
+		mainPart2("exchange/day16/feri/input.txt");
 		System.out.println("---------------");
 	}
 
