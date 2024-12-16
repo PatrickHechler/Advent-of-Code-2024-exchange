@@ -32,16 +32,18 @@ enum dir {
 	x_inc, y_inc, x_dec, y_dec,
 };
 
+static const char dtc[] = { '>', 'v', '<', '^' };
+
 struct pos {
 	num x;
 	num y;
 };
 
 struct reindeer {
-	num x;
-	num y;
+	struct pos pos;
 	enum dir dir;
 	num score;
+	struct hashset hist;
 };
 
 struct data {
@@ -51,6 +53,29 @@ struct data {
 	size_t max_line_count;
 };
 
+struct pr_arg {
+	const char *name;
+	FILE *str;
+};
+
+static int v_print_p(void *param, void *element) {
+	struct pos *p = element;
+	fprintf(param, " ("NUMF"|"NUMF")", p->x, p->y);
+	return 0;
+}
+
+static int v_print_r(void *param, void *element) {
+	struct pr_arg *arg = param;
+	struct reindeer *r = element;
+	fprintf(arg->str, "%s: score=%s, cur=("NUMF"|"NUMF":%c)", arg->name,
+			u64toa(r->score), r->pos.x, r->pos.y, dtc[r->dir]);
+	hs_for_each(&r->hist, arg->str, v_print_p);
+	fputc('\n', arg->str);
+	return 0;
+}
+
+static int do_print = 0;
+
 static void print(FILE *str, struct data *data, struct hashset *all,
 		struct hashset *new, uint64_t result) {
 	if (result != UINT64_MAX) {
@@ -59,10 +84,13 @@ static void print(FILE *str, struct data *data, struct hashset *all,
 	} else {
 		fputs(STEP_BODY, str);
 	}
+	if (!do_print) {
+		return;
+	}
 	for (num y = 0; y < data->line_count; ++y) {
-		struct reindeer r = { .y = y };
+		struct reindeer r = { .pos.y = y };
 		for (num x = 0; x < data->line_length; ++x) {
-			r.x = x;
+			r.pos.x = x;
 			r.dir = x_inc;
 			int in_new = !!hs_get(new, &r);
 			r.dir = y_inc;
@@ -91,17 +119,50 @@ static void print(FILE *str, struct data *data, struct hashset *all,
 		}
 		fputc('\n', str);
 	}
+	fputs(STEP_FOOTER, str);
+	struct pr_arg arg = { .name = "all", .str = str };
+	hs_for_each(all, &arg, v_print_r);
+	arg.name = "new";
+	hs_for_each(new, &arg, v_print_r);
 	fputs(STEP_FINISHED, str);
 }
 
 static uint64_t r_h(const void *a) {
 	const struct reindeer *p = a;
-	return (p->x << 8) ^ (p->y << 16) ^ p->dir;
+	uint64_t result = 1;
+	result = 13 * result + p->dir;
+	result = 31 * result + p->pos.x;
+	result = 71 * result + p->pos.y;
+	return result;
 }
 
 static int r_eq(const void *a0, const void *b0) {
 	const struct reindeer *a = a0, *b = b0;
-	return a->x == b->x && a->y == b->y && a->dir == b->dir;
+	return a->pos.x == b->pos.x && a->pos.y == b->pos.y && a->dir == b->dir;
+}
+
+static uint64_t p_h(const void *a) {
+	const struct pos *p = a;
+	uint64_t result = 1;
+	result = 31 * result + p->x;
+	result = 71 * result + p->y;
+	return result;
+}
+
+static int p_eq(const void *a0, const void *b0) {
+	const struct pos *a = a0, *b = b0;
+	return a->x == b->x && a->y == b->y;
+}
+
+static void* new_pos(void *param, void *element) {
+	struct pos *result = malloc(sizeof(struct pos));
+	*result = *(struct pos*) element;
+	return result;
+}
+
+static int vf_pos_add(void *param, void *element) {
+	hs_compute_absent(param, element, 0, new_pos);
+	return 0;
 }
 
 static void* compute(void *param, void *old_val, void *new_val) {
@@ -109,25 +170,35 @@ static void* compute(void *param, void *old_val, void *new_val) {
 		if (param) {
 			goto check_other;
 		}
+		if (part == 2) {
+			goto return_new;
+		}
 		return new_val;
 	}
 	struct reindeer *or = old_val, *nr = new_val;
 	if (or->score <= nr->score) {
+		if (part == 2 && or->score == nr->score) {
+			hs_for_each(&nr->hist, &or->hist, vf_pos_add);
+		}
 		return or;
 	}
 	if (!param) {
-		return nr;
+		goto return_new;
 	}
 	check_other: or = hs_get(param, nr);
 	if (!or || or->score > nr->score) {
+		return_new: ;
 		struct reindeer *result = malloc(sizeof(struct reindeer));
+		struct hashset hs = { .equal = p_eq, .hash = p_h, .free = free };
+		hs_for_each(&nr->hist, &hs, vf_pos_add);
 		*result = *nr;
+		result->hist = hs;
 		return result;
 	}
 	return 0;
 }
 
-static int f_add(void *param, void *element) {
+static int vf_add(void *param, void *element) {
 	if (hs_compute(param, element, 0, compute) != element) {
 		free(element);
 	}
@@ -139,26 +210,9 @@ struct sa {
 	struct hashset *all;
 	struct hashset *fill;
 	uint64_t result;
+	struct hashset *best;
 };
-/*
- #################
- #...#...#...#..E#
- #.#.#.#.#.#.#.#^#
- #.#.#.#...#...#^#
- #.#.#.#.###.#.#^#
- #>>v#.#.#.....#^#
- #^#v#.#.#.#####^#
- #^#v..#.#.#>>>>^#
- #^#v#####.#^###.#
- #^#v#..>>>>^#...#
- #^#v###^#####.###
- #^#v#>>^#.....#.#
- #^#v#^#####.###.#
- #^#v#^........#.#
- #^#v#^#########.#
- #S#>>^..........#
- #################
- */
+
 static int v_step(void *param, void *element) {
 	struct sa *arg = param;
 	struct reindeer *r = element;
@@ -181,67 +235,86 @@ static int v_step(void *param, void *element) {
 		yadd = -1;
 		break;
 	}
-	num x = r->x, y = r->y;
+	struct pos p = { .x = r->pos.x, .y = r->pos.y };
 	uint64_t score = r->score;
 	if (xadd) {
-		if (arg->data->lines[y - 1][x] != '#') {
-			struct reindeer rd = { .x = x, .y = y, .dir = y_dec, .score = score
-					+ 1000 };
+		if (arg->data->lines[p.y - 1][p.x] != '#') {
+			struct reindeer rd = { .pos = p, .dir = y_dec,
+					.score = score + 1000, .hist = r->hist };
 			if (rd.score <= arg->result) {
 				hs_compute(arg->fill, &rd, arg->all, compute);
 			}
 		}
-		if (arg->data->lines[y + 1][x] != '#') {
-			struct reindeer rd = { .x = x, .y = y, .dir = y_inc, .score = score
-					+ 1000 };
+		if (arg->data->lines[p.y + 1][p.x] != '#') {
+			struct reindeer rd = { .pos = p, .dir = y_inc,
+					.score = score + 1000, .hist = r->hist };
 			if (rd.score <= arg->result) {
 				hs_compute(arg->fill, &rd, arg->all, compute);
 			}
 		}
 	} else {
-		if (arg->data->lines[y][x - 1] != '#') {
-			struct reindeer rd = { .x = x, .y = y, .dir = x_dec, .score = score
-					+ 1000 };
+		if (arg->data->lines[p.y][p.x - 1] != '#') {
+			struct reindeer rd = { .pos = p, .dir = x_dec,
+					.score = score + 1000, .hist = r->hist };
 			if (rd.score <= arg->result) {
 				hs_compute(arg->fill, &rd, arg->all, compute);
 			}
 		}
-		if (arg->data->lines[y][x + 1] != '#') {
-			struct reindeer rd = { .x = x, .y = y, .dir = x_inc, .score = score
-					+ 1000 };
+		if (arg->data->lines[p.y][p.x + 1] != '#') {
+			struct reindeer rd = { .pos = p, .dir = x_inc,
+					.score = score + 1000, .hist = r->hist };
 			if (rd.score <= arg->result) {
 				hs_compute(arg->fill, &rd, arg->all, compute);
 			}
 		}
 	}
+	struct hashset hs = { .equal = p_eq, .hash = p_h, .free = free };
+	hs_for_each(&r->hist, &hs, vf_pos_add);
 	while (score < arg->result) {
-		x += xadd;
-		y += yadd;
+		p.x += xadd;
+		p.y += yadd;
 		score++;
-		char c = arg->data->lines[y][x];
-		if (c == '.' || c == 'S') {
-			struct reindeer rd =
-					{ .x = x, .y = y, .dir = r->dir, .score = score };
+		hs_set(&hs, new_pos(0, &p));
+		static long l = 0;
+		printf("l=%ld\n", ++l);
+		char c = arg->data->lines[p.y][p.x];
+		if (c == '.') {
+			struct reindeer rd = { .pos = p, .dir = r->dir, .score = score,
+					.hist = hs };
 			hs_compute(arg->fill, &rd, arg->all, compute);
-			continue;
+			//TODO add again continue;
+			break;
 		}
 		if (c == '#')
 			break;
 		if (c == 'E') {
+			if (arg->result != score) {
+				hs_clear(arg->best);
+			}
+			hs_for_each(&hs, arg->best, vf_pos_add);
 			arg->result = score;
-			return 0;
+			break;
 		}
 		fprintf(stderr, "invalid char %c\n", c);
 		exit(1);
 	}
+	hs_clear(&hs);
 	return 0;
 }
 
 static uint64_t do_step(struct data *data, struct hashset *all,
-		struct hashset *new, struct hashset *fill, uint64_t result) {
-	struct sa arg = { .data = data, .all = all, .fill = fill, .result = result };
+		struct hashset *new, struct hashset *fill, uint64_t result,
+		struct hashset *best) {
+	struct sa arg = { .data = data, .all = all, .fill = fill, .result = result,
+			.best = best };
 	hs_for_each(new, &arg, v_step);
 	return arg.result;
+}
+
+static int clear_pos(void *param, void *element) {
+	struct reindeer *r = element;
+	hs_clear(&r->hist);
+	return 0;
 }
 
 static char* solve(char *path) {
@@ -250,29 +323,40 @@ static char* solve(char *path) {
 	struct hashset new = { .equal = r_eq, .hash = r_h, };
 	struct hashset fill = { .equal = r_eq, .hash = r_h, };
 	struct hashset all = { .equal = r_eq, .hash = r_h, .free = free, };
+	struct hashset best = { .equal = p_eq, .hash = p_h, .free = free, };
 	struct pos s;
 	for (num y = 0; y < data->line_count; ++y) {
 		char *start = strchr(data->lines[y], 'S');
 		if (start) {
 			s.y = y;
 			s.x = start - data->lines[y];
+			*start = '.';
 			break;
 		}
 	}
-	struct reindeer *r = malloc(sizeof(struct reindeer));
-	r->score = 0;
+	struct reindeer *r = calloc(1, sizeof(struct reindeer));
 	r->dir = x_inc;
-	r->x = s.x;
-	r->y = s.y;
+	r->pos = s;
+	r->hist.equal = p_eq;
+	r->hist.hash = p_h;
+	r->hist.free = free;
+	hs_add(&r->hist, new_pos(0, &s));
 	hs_add(&new, r);
-	long l = 0;
 	while (new.entry_count) {
 		print(stdout, data, &all, &new, result);
-		result = do_step(data, &all, &new, &fill, result);
-		hs_filter(&new, &all, f_add);
-		hs_filter(&fill, &new, f_add);
+		result = do_step(data, &all, &new, &fill, result, &best);
+		hs_filter(&new, &all, vf_add);
+		hs_filter(&fill, &new, vf_add);
 	}
 	print(stdout, data, &all, &new, result);
+	if (part == 2) {
+		result = best.entry_count;
+	}
+	hs_for_each(&all, 0, clear_pos);
+	hs_clear(&all);
+	hs_clear(&new);
+	hs_clear(&fill);
+	hs_clear(&best);
 	return u64toa(result);
 }
 

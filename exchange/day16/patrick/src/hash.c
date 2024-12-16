@@ -75,7 +75,9 @@ static void free_entries(ssize_t entry_count, union hs_entry *data,
 			} while (e.list);
 		}
 	}
-	free(data);
+	if (data) {
+		free(data);
+	}
 }
 
 struct ra {
@@ -125,7 +127,8 @@ void* hs_remove(struct hashset *hs, void *val) {
 	if (!hs->entry_count) {
 		return 0;
 	}
-	if (hs->entry_count < (hs->data_size >> 4) && hs->entry_count > 64) {
+	if (hs->entry_count < (hs->data_size >> 4) && hs->entry_count > 64
+			&& hs->data_size > 16) { // maintain a minimum size
 		size_t ns = hs->data_size >> 1;
 		int err = errno;
 		union hs_entry *new_data = calloc(ns, sizeof(union hs_entry));
@@ -189,11 +192,11 @@ void* hs_remove(struct hashset *hs, void *val) {
 }
 
 static inline void check_grow(struct hashset *hs) {
-	if (hs->entry_count > ((hs->data_size >> 2) + (hs->data_size >> 3))
-			&& (hs->data_size << 1)) {
+	if (hs->entry_count > (hs->data_size - (hs->data_size >> 2))) {
 		size_t ns = hs->data_size << 1;
 		int err = errno;
-		union hs_entry *new_data = calloc(ns, sizeof(union hs_entry));
+		union hs_entry *new_data = calloc(hs->data_size,
+				sizeof(union hs_entry) * 2);
 		if (new_data) {
 			struct ra arg = { new_data, ns - 1, hs->hash };
 			if (hs_for_each(hs, &arg, v_rebuild)) {
@@ -423,7 +426,7 @@ void* hs_set(struct hashset *hs, void *val) {
 				void *res = l->value;
 				l->value = val;
 				if (hs->free) {
-					hs->free(e.value);
+					hs->free(res);
 				}
 				return res;
 			}
