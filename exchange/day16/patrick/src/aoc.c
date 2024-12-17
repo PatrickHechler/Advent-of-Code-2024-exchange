@@ -18,8 +18,14 @@
 #include <search.h>
 #include <string.h>
 
+struct data* read_data(const char *path);
+
 int day = 16;
 int part = 2;
+FILE *solution_out;
+#ifdef INTERACTIVE
+static int interactive = 0;
+#endif
 
 typedef long num;
 #define NUMF "%ld"
@@ -124,6 +130,7 @@ static void print(FILE *str, struct data *data, struct hashset *all,
 	hs_for_each(all, &arg, v_print_r);
 	arg.name = "new";
 	hs_for_each(new, &arg, v_print_r);
+	fputs(STEP_FOOTER, str);
 	fputs(STEP_FINISHED, str);
 }
 
@@ -317,7 +324,7 @@ static int clear_pos(void *param, void *element) {
 	return 0;
 }
 
-static char* solve(char *path) {
+const char* solve(const char *path) {
 	struct data *data = read_data(path);
 	uint64_t result = UINT64_MAX;
 	struct hashset new = { .equal = r_eq, .hash = r_h, };
@@ -343,12 +350,13 @@ static char* solve(char *path) {
 	hs_add(&r->hist, new_pos(0, &s));
 	hs_add(&new, r);
 	while (new.entry_count) {
-		print(stdout, data, &all, &new, result);
+		print(solution_out, data, &all, &new, result);
 		result = do_step(data, &all, &new, &fill, result, &best);
 		hs_filter(&new, &all, vf_add);
 		hs_filter(&fill, &new, vf_add);
 	}
-	print(stdout, data, &all, &new, result);
+	print(solution_out, data, &all, &new, result);
+	fputs(STEP_ALL_FINISHED, solution_out);
 	if (part == 2) {
 		result = best.entry_count;
 	}
@@ -393,126 +401,6 @@ static struct data* parse_line(struct data *data, char *line) {
 	data->lines[data->line_count - 1] = strdup(line);
 	return data;
 }
-
-#ifdef INTERACTIVE
-enum cache_policy keep = keep_last;
-
-struct data* copy_data(struct data *data) {
-	struct data *result = malloc(sizeof(struct data));
-	result->max_robots_count = data->robots_count;
-	result->robots_count = data->robots_count;
-	result->robots = malloc(sizeof(struct robot) * data->robots_count);
-	if (!result->robots) {
-		perror("malloc");
-		exit(8);
-	}
-	result->orig_robots = data->orig_robots;
-	memcpy(result->robots, data->robots,
-			sizeof(struct robot) * data->robots_count);
-	return result;
-}
-
-void free_data(struct data *data) {
-	free(data->robots);
-	free(data);
-}
-
-int next_data(struct data *data) {
-	if (!data->orig_robots) {
-		data->orig_robots = malloc(sizeof(struct robot) * data->robots_count);
-		memcpy(data->orig_robots, data->robots,
-				sizeof(struct robot) * data->robots_count);
-	} else if (!memcmp(data->orig_robots, data->robots,
-			sizeof(struct robot) * data->robots_count)) {
-		return 0;
-	}
-	if (!has_next_world(data)) {
-		return 0;
-	}
-	for (off_t i = 0; i < data->robots_count; ++i) {
-		struct robot *r = data->robots + i;
-		r->pos.x = (r->pos.x + r->vec.x + x_count) % x_count;
-		r->pos.y = (r->pos.y + r->vec.y + y_count) % y_count;
-	}
-	return 1;
-}
-
-void world_sizes(struct data *data, struct coordinate *min,
-		struct coordinate *max) {
-	min->x = 0;
-	min->y = 0;
-	max->x = x_count - 1;
-	max->y = y_count - 1;
-}
-
-size_t get(struct data *data, off_t x, off_t y, size_t text_size, char *buf0,
-		size_t buf_len) {
-	static char buf2[101];
-	size_t result = 0;
-	memset(buf2, 0, 101);
-	for (off_t i = 0; i < data->robots_count; ++i) {
-		struct robot *r = data->robots + i;
-		if (r->pos.y == y) {
-			buf2[r->pos.x]++;
-		}
-	}
-#define add(buf_add, txt_add) \
-	if (buf_add > buf_len) { \
-		buf_len = 0; \
-	} else { \
-		buf_len -= buf_add; \
-	} \
-	if (text_size >= txt_add) { \
-		text_size -= txt_add; \
-	} else { \
-		abort(); \
-	} \
-	result += buf_add; \
-	buf0 += buf_add;
-
-	if (x < 0) {
-		int len = -x > text_size ? text_size : -x;
-		size_t add = skip_columns(buf0, buf_len, len);
-		add(add, len);
-		x = 0;
-		if (!text_size) {
-			return result;
-		}
-	}
-	int add = snprintf(buf0, buf_len, FC_GRAY);
-	add(add, 0);
-	int is_back = 251;
-	for (; x < x_count && text_size; ++x) {
-		if (buf2[x]) {
-			int c = buf2[x] > 9 ? '9' + 1 : '0' + buf2[x];
-			if (is_back) {
-				int add = snprintf(buf0, buf_len, FC_GREEN "%c", c);
-				add(add, 1);
-			} else {
-				if (buf_len) {
-					*buf0 = c;
-				}
-				add(1, 1);
-			}
-			is_back = 0;
-		} else {
-			if (is_back) {
-				if (buf_len) {
-					*buf0 = '.';
-				}
-				add(1, 1);
-			} else {
-				int add = snprintf(buf0, buf_len, FC_GRAY ".");
-				add(add, 1);
-			}
-			is_back = 265;
-		}
-	}
-//	size_t add_len = skip_columns(buf0, buf_len, text_size);
-//	add(add, text_size);
-	return result;
-}
-#endif
 
 // common stuff
 
@@ -626,9 +514,7 @@ struct data* read_data(const char *path) {
 }
 
 int main(int argc, char **argv) {
-#ifdef INTERACTIVE
-	int interactive = 0;
-#endif
+	solution_out = stdout;
 	char *me = argv[0];
 	char *f = 0;
 	if (argc > 1) {
@@ -643,7 +529,7 @@ int main(int argc, char **argv) {
 #ifdef INTERACTIVE
 							" [interactive]"
 #endif
-							" [p1|p2] [DATA]\n", me);
+					" [p1|p2] [DATA]\n", me);
 			return 1;
 		}
 		int idx = 1;
@@ -657,7 +543,7 @@ int main(int argc, char **argv) {
 		}
 		if (idx < argc)
 #endif
-		{
+				{
 			if (!strcmp("p1", argv[idx])) {
 				part = 1;
 				idx++;
@@ -693,7 +579,7 @@ int main(int argc, char **argv) {
 #endif
 	printf("execute now day %d part %d on file %s\n", day, part, f);
 	clock_t start = clock();
-	char *result = solve(f);
+	const char *result = solve(f);
 	clock_t end = clock();
 	if (result) {
 		uint64_t diff = end - start;
