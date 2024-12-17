@@ -55,7 +55,7 @@ void* hs_get(struct hashset *hs, void *val) {
 static void free_entries(ssize_t entry_count, union hs_entry *data,
 		void (*free_element)(void*)) {
 	ssize_t remain = entry_count;
-	for (off_t o = 0; entry_count < 0 ? o < -entry_count : remain; o++) {
+	for (size_t o = 0; entry_count < 0 ? o < -entry_count : remain; o++) {
 		union hs_entry e = data[o];
 		if (e.number > 0) {
 			if (free_element) {
@@ -520,7 +520,7 @@ void hs_clear(struct hashset *hs) {
 int hs_for_each(struct hashset *hs, void *param,
 		int (*visitor)(void *param, void *element)) {
 	size_t remain = hs->entry_count;
-	for (off_t o = 0; remain; o++) {
+	for (size_t o = 0; remain; o++) {
 		union hs_entry e = hs->data[o];
 		if (e.number > 0) {
 			int v = visitor(param, e.value);
@@ -546,7 +546,7 @@ int hs_for_each(struct hashset *hs, void *param,
 void hs_filter(struct hashset *hs, void *param,
 		int (*retain_element)(void *param, void *element)) {
 	size_t remain = hs->entry_count;
-	for (off_t o = 0; remain; o++) {
+	for (size_t o = 0; remain; o++) {
 		union hs_entry *ep = hs->data + o;
 		union hs_entry e = *ep;
 		if (e.number > 0) {
