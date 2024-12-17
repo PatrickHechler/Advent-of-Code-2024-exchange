@@ -1,6 +1,7 @@
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -151,19 +152,273 @@ public class Y24Day17 {
 
 
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
+
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				int a = Integer.parseInt(scanner.nextLine().trim().replaceFirst(REGISTER_RX, "$2"));
+				int b = Integer.parseInt(scanner.nextLine().trim().replaceFirst(REGISTER_RX, "$2"));
+				int c = Integer.parseInt(scanner.nextLine().trim().replaceFirst(REGISTER_RX, "$2"));
+				scanner.nextLine();
+				String[] strProg = scanner.nextLine().trim().replaceFirst(PROGRAM_RX, "$1").split(",");
+				int[] prog = new int[strProg.length];
+				for (int i=0; i<strProg.length; i++) {
+					prog[i] = Integer.parseInt(strProg[i]);
+				}
+				System.out.println("---------------------");
+				CPU cpu = new CPU(a,b,c, prog);
+				System.out.println(cpu.toString());
+				while(cpu.exec()) {
+					System.out.println(cpu.toString());
+				}
+				System.out.println(cpu.getOutput());
+				if (scanner.hasNext()) {
+					scanner.nextLine();
+				}
+			}
+		}
 	}
 
 
+	public static String padl(String txt, char padChar, int len) {
+		String result = txt;
+		while (result.length()<len) {
+			result = padChar + result;
+		}
+		return result;
+	}
+	
+	public static String run(int A) {
+		StringBuilder result = new StringBuilder(); 
+		// int A=0b001011100;
+		int B=0;
+		int C=0;
+		
+		while (true) {
+//			System.out.println("A: "+Integer.toString(A, 2));
+			//  0: BST 4
+			//  2: BXL 3
+			B = (A^0x3) & 0x7;    // --> A: xxx(000) --> 011  / xxx011 --> 000
+//			System.out.println("B: "+Integer.toString(B, 2));
+					
+			//  4: CDV 5
+			C = A / (1 << B);
+//			System.out.println("C: "+Integer.toString(C, 2));
+			
+			//  6: BXL 5
+			// 10: BXC 3
+			B = B ^ 0x5 ^ C;
+			
+			// 12: OUT 5
+//			System.out.println("OUT["+(B&0x7)+"]");
+			result.append(""+(B&0x7));
+			if (result.length()>100) {
+				break;
+			}
+			
+			//  8: ADV 3
+			A = A >> 3;
+			
+			B = 0;
+			C = 0;
+			
+			// 14: JNZ 0
+			if (A==0) {
+				break;
+			}
+		}
+		return result.toString(); 
+	}
+
+	
+	public static List<Integer> recursiveSearchA(String searchString) {
+		if (searchString.equals("")) {
+			return Arrays.asList(0);
+		}
+		List<Integer> result = new ArrayList<>();
+		List<Integer> possibleAs = recursiveSearchA(searchString.substring(1));
+		for (int possibleA:possibleAs) {
+			for (int a=0; a<=7; a++) {
+				if (run((possibleA<<3)+a).equals(searchString)) {
+					result.add((possibleA<<3)+a);
+				}
+			}
+		}
+		System.out.println("FOUND for "+searchString+": "+result);
+		return result;
+	}
+	
+	public static void test() {
+		String solution = "2413751503435530";
+		List<Integer> results = recursiveSearchA(solution);
+		System.out.println(results);
+	}
+
+	/*
+	A: 000000 -> 6
+	A: 000001 -> 7
+	A: 000010 -> 5
+	A: 000011 -> 6
+	A: 000100 -> 2
+	A: 000101 -> 3
+	A: 000110 -> 0
+	A: 000111 -> 1
+	A: 001000 -> 77
+	A: 001001 -> 57
+	A: 001010 -> 17
+	A: 001011 -> 67
+	A: 001100 -> 27
+	A: 001101 -> 37
+	A: 001110 -> 07
+	A: 001111 -> 17
+	A: 010000 -> 45
+	A: 010001 -> 35
+	A: 010010 -> 55
+	A: 010011 -> 65
+	A: 010100 -> 25
+	A: 010101 -> 35
+	A: 010110 -> 05
+	A: 010111 -> 05
+	A: 011000 -> 56
+	A: 011001 -> 16
+	A: 011010 -> 16
+	A: 011011 -> 66
+	A: 011100 -> 26
+	A: 011101 -> 36
+	A: 011110 -> 06
+	A: 011111 -> 06
+	A: 100000 -> 22
+	A: 100001 -> 72
+	A: 100010 -> 52
+	A: 100011 -> 62
+	A: 100100 -> 22
+	A: 100101 -> 32
+	A: 100110 -> 12
+	A: 100111 -> 32
+	A: 101000 -> 33
+	A: 101001 -> 53
+	A: 101010 -> 13
+	A: 101011 -> 63
+	A: 101100 -> 23
+	A: 101101 -> 33
+	A: 101110 -> 13
+	A: 101111 -> 33
+	A: 110000 -> 00
+	A: 110001 -> 30
+	A: 110010 -> 50
+	A: 110011 -> 60
+	A: 110100 -> 20
+	A: 110101 -> 30
+	A: 110110 -> 10
+	A: 110111 -> 20
+	A: 111000 -> 11
+	A: 111001 -> 11
+	A: 111010 -> 11
+	A: 111011 -> 61
+	A: 111100 -> 21
+	A: 111101 -> 31
+	A: 111110 -> 11
+	A: 111111 -> 21
+	
+	2,4,1,3,7,5,1,5,0,3,4,3,5,5,3,0
+
+	starting from end: 0
+	
+	only possible A:
+	
+	A: 000110 -> 0
+	
+	next is 3 starting A with 110
+	
+	A: 110001 -> 30
+	A: 110101 -> 30
+	
+	next is 5 starting A with 110001 or 110101 
+	
+	*/
+
+	// 2,4,1,3,7,5,1,5,0,3,4,3,5,5,3,0
+	public static void test_manual() {
+		int A=0b001011100;
+		int B=0;
+		int C=0;
+		
+		while (true) {
+			System.out.println("A: "+Integer.toString(A, 2));
+			//  0: BST 4
+			//  2: BXL 3
+			B = (A^0x3) & 0x7;    // --> A: xxx(000) --> 011  / xxx011 --> 000
+			System.out.println("B: "+Integer.toString(B, 2));
+					
+			//  4: CDV 5
+			C = A / (1 << B);
+			System.out.println("C: "+Integer.toString(C, 2));
+			
+			//  6: BXL 5
+			// 10: BXC 3
+			B = B ^ 0x5 ^ C;
+			
+			// 12: OUT 5
+			System.out.println("OUT["+(B&0x7)+"]");
+			
+			//  8: ADV 3
+			A = A >> 3;
+			
+			B = 0;
+			C = 0;
+			
+			// 14: JNZ 0
+			if (A==0) {
+				break;
+			}
+		}
+	}
+
+	public static void test_ORIG() {
+		int A=47006051;
+		int B=0;
+		int C=0;
+		
+		while (true) {
+			//  0: BST 4
+			B = A & 0x7;
+					
+			//  2: BXL 3
+			B = B ^ 0x3;
+					
+			//  4: CDV 5
+			C = A / (1 << (B&0x7));
+			
+			//  6: BXL 5
+			B = B ^ 0x5;
+			
+			//  8: ADV 3
+			A = A / 8;
+			
+			// 10: BXC 3
+			B = B ^ C;
+			
+			// 12: OUT 5
+			System.out.println("OUT["+(B&0x7)+"]");
+			
+			// 14: JNZ 0
+			if (A==0) {
+				break;
+			}
+		}
+	}
+
 	
 	public static void main(String[] args) throws FileNotFoundException {
+		test();
+		if (1==1) return;
 		System.out.println("--- PART I  ---");
 //		mainPart1("exchange/day17/feri/input-example.txt");
 //		mainPart1("exchange/day17/feri/input-example-2.txt");
-		mainPart1("exchange/day17/feri/input.txt");     // not 6,3,3,3,4,0,0,0,4
+		mainPart1("exchange/day17/feri/input.txt");     
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-//		mainPart2("exchange/day17/feri/input-example-2.txt");
+//		mainPart2("exchange/day17/feri/input-example-p2.txt");
 		mainPart2("exchange/day17/feri/input.txt");
 		System.out.println("---------------");
 	}
