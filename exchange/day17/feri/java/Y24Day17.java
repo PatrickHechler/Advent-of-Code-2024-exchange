@@ -187,11 +187,11 @@ public class Y24Day17 {
 		return result;
 	}
 	
-	public static String run(int A) {
+	public static String run(long A) {
 		StringBuilder result = new StringBuilder(); 
-		// int A=0b001011100;
-		int B=0;
-		int C=0;
+		// long A=0b001011100;
+		long B=0;
+		long C=0;
 		
 		while (true) {
 //			System.out.println("A: "+Integer.toString(A, 2));
@@ -230,14 +230,14 @@ public class Y24Day17 {
 	}
 
 	
-	public static List<Integer> recursiveSearchA(String searchString) {
+	public static List<Long> recursiveSearchA(String searchString) {
 		if (searchString.equals("")) {
-			return Arrays.asList(0);
+			return Arrays.asList(0L);
 		}
-		List<Integer> result = new ArrayList<>();
-		List<Integer> possibleAs = recursiveSearchA(searchString.substring(1));
-		for (int possibleA:possibleAs) {
-			for (int a=0; a<=7; a++) {
+		List<Long> result = new ArrayList<>();
+		List<Long> possibleAs = recursiveSearchA(searchString.substring(1));
+		for (long possibleA:possibleAs) {
+			for (long a=0; a<=7; a++) {
 				if (run((possibleA<<3)+a).equals(searchString)) {
 					result.add((possibleA<<3)+a);
 				}
@@ -249,8 +249,8 @@ public class Y24Day17 {
 	
 	public static void test() {
 		String solution = "2413751503435530";
-		List<Integer> results = recursiveSearchA(solution);
-		System.out.println(results);
+		List<Long> results = recursiveSearchA(solution);
+		System.out.println(results.stream().reduce(Long.MAX_VALUE, Long::min));
 	}
 
 	/*
