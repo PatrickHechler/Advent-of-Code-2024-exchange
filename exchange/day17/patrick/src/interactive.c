@@ -42,31 +42,38 @@ static FILE *data_in;
 #define read(in, buf, count) fread(in, 1, buf, count)
 #define write(out, buf, count) fwrite(out, 1, buf, count); fflush(out)
 #define dprintf(out, ...) fprintf(out, __VA_ARGS__); fflush(out)
+#define close(fd) fclose(fd)
+#define lseek(fd, off, whence) fsseko(fd, off, whence)
 #endif // __unix__
 #define writestr(out, str) write(out, str, sizeof(str) - 1)
 #define addstr(str) ensure_buf(sizeof(str) - 1); \
 	memcpy(buf + buf_end_pos, str, sizeof(str) - 1); \
 	buf_end_pos += sizeof(str) - 1
 
-typedef struct coordinate pos;
+typedef long pos;
+struct pos2d {
+	pos x;
+	pos y;
+};
+typedef struct pos2d pos2;
 
-static pos cur = { 0, 0 };
+static pos2 cur = { 0, 0 };
 #ifndef __STDC_NO_THREADS__
 thrd_t thrd;
 #endif
 static char *puzzle_file;
 static const char *data_file = "out.txt";
-static size_t world_idx = 0;
-static size_t world_off = 0;
+static pos world_idx = 0;
+static off_t world_off = 0;
 static char *world_data = 0;
 static size_t world_data_max_size = 0;
 static size_t world_data_size = 0;
 
-static pos display_sizes = { 0, 0 };
+static pos2 display_sizes = { 0, 0 };
 
-static pos max_cur_pos = { 0, 0 };
-static pos max_pos = { 0, 0 };
-static pos min_pos = { 0, 0 };
+static pos2 max_cur_pos = { 0, 0 };
+static pos2 max_pos = { 0, 0 };
+static pos2 min_pos = { 0, 0 };
 
 static size_t buf_capacity;
 static size_t buf_end_pos;
@@ -77,7 +84,7 @@ static size_t rbuf_pos;
 static size_t rbuf_end_pos;
 static char *rbuf;
 
-static void update_display_size();
+static int update_display_size(int allow_fail);
 static void write_buf();
 static int ensure_buf(size_t free_space);
 static int ensure_rbuf(size_t free_space, size_t end_allocated_space);
@@ -129,15 +136,18 @@ static void recalc_header_footer_sizes() {
 			+ footer_display_lines;
 }
 
-static char* text_end(char *c, size_t len, size_t max_text) {
-	while (max_text) {
-#define min_len (len < max_text ? len : max_text)
+static char* text_end(char *c, size_t len, size_t max_text, size_t *real_text) {
+	size_t rt = 0;
+	while (rt < max_text) {
+#define min_len (len < (max_text - rt) ? len : (max_text - rt))
 		char *c2 = memchr(c, ESC_C, min_len);
 		if (!c2) {
+			if (real_text)
+				*real_text = rt;
 			return c + min_len;
 		}
 		len -= c2 - c;
-		max_text -= c2 - c;
+		rt += c2 - c;
 		if (!min_len) {
 			return c2;
 		}
@@ -161,15 +171,19 @@ static char* text_end(char *c, size_t len, size_t max_text) {
 			break;
 		}
 		if (*c != 'm' && !len) {
+			if (real_text)
+				*real_text = rt;
 			return c2;
 		}
 	}
+	if (real_text)
+		*real_text = rt;
 	return c + len;
 }
 
 static void show() {
 	const char *add_str = "";
-	if (world_data[world_data_size - 1] == EM_C) {
+	if (world_data_size && world_data[world_data_size - 1] == EM_C) {
 		add_str = " last";
 	}
 	int add = snprintf(buf + buf_end_pos, buf_capacity - buf_end_pos,
@@ -188,6 +202,7 @@ static void show() {
 		show();
 		return;
 	}
+	int warned_corrupt_world = 0;
 	buf_end_pos += add;
 	/* the solution data must not use fancy terminal control sequences, they
 	 * are only here allowed, the solution data may use color/similar control
@@ -195,8 +210,9 @@ static void show() {
 	char *pos = world_data;
 	if (pos[0] == SOH_C && pos[1] != STX_C) {
 		char *end = memchr(pos, STX_C, world_data_size);
-		if (!end) {
+		if (!end && !warned_corrupt_world) {
 			addstr(FC_RED "the world seems to be incomplete\n" FC_DEF);
+			warned_corrupt_world = 1;
 		}
 		while (pos < end) {
 			/* there must not be many header lines, but the header lines may
@@ -204,8 +220,8 @@ static void show() {
 			char *eol = memchr(pos, '\n', end - pos);
 			if (!eol)
 				eol = end;
-			char *end = text_end(pos, eol - pos,
-					display_sizes.x - side_columns);
+			char *end = text_end(pos, eol - pos, display_sizes.x - side_columns,
+					0);
 			int len = end - pos;
 			/* if the header line is too long, just truncate it */
 			int need = snprintf(buf, buf_capacity - buf_end_pos, "%.*s\n", len,
@@ -213,21 +229,33 @@ static void show() {
 			pos = eol + 1;
 		}
 		pos = end;
-	} else if (pos[0] != SOH_C && pos[0] != STX_C) {
+	} else if (pos[0] != SOH_C && pos[0] != STX_C && !warned_corrupt_world) {
 		addstr(BC_RED "the world is corrupt\n" BC_DEF);
+		warned_corrupt_world = 1;
 	}
 	if (*pos == STX_C) {
 		pos++;
-	} else {
+	} else if (!warned_corrupt_world) {
 		addstr(FC_RED "the world seems to be incomplete\n" FC_DEF);
+		warned_corrupt_world = 1;
 	}
 	addstr("\u250C");
 	for (size_t i = 1; i < display_sizes.x - 1; ++i) {
 		addstr("\u2500");
 	}
 	addstr("\u2510");
-	for (size_t y = min_pos.y; y < cur.y; y++)
-		pos = strchr(pos, '\n') + 1;
+	char *end = memchr(pos, ETX_C, world_data + world_data_size - pos);
+	if (!end)
+		end = memchr(pos, EOT_C, world_data + world_data_size - pos);
+	if (!end) {
+		end = world_data + world_data_size;
+		if (end[-1] == EM_C)
+			--end;
+		if (end[-1] == FF_C)
+			--end;
+	}
+	for (size_t y = min_pos.y; y < cur.y; y++, pos++)
+		pos = memchr(pos, '\n', end - pos);
 	for (size_t l = 0;
 			l < display_sizes.y - header_display_lines - footer_display_lines;
 			++l) {
@@ -235,17 +263,26 @@ static void show() {
 		if (side_columns != 2) {
 			exit(EXIT_FAILURE);
 		}
-		retry: ;
-		while (82) {
-			size_t need = 0;
-//			get(data, cur.x, cur.y + l,
-//					display_sizes.x - side_columns, buf + buf_end_pos,
-//					buf_capacity - buf_end_pos);
-			if (ensure_buf(need)) {
-				continue;
+		if (l + cur.y <= max_pos.y) {
+			char *eol = memchr(pos, '\n', end - pos);
+			if (!eol)
+				eol = end;
+			retry: ;
+			while (82) {
+				if (cur.x != min_pos.x) {
+					pos = text_end(pos, eol - pos, cur.x - min_pos.x, 0);
+				}
+				char *e = text_end(pos, eol - pos,
+						display_sizes.x - side_columns, 0);
+				size_t need = e - pos;
+				if (ensure_buf(need)) {
+					continue;
+				}
+				memcpy(buf + buf_end_pos, pos, need);
+				buf_end_pos += need;
+				break;
 			}
-			buf_end_pos += need;
-			break;
+			pos = eol + 1;
 		}
 		while (109) {
 			size_t need = snprintf(buf + buf_end_pos,
@@ -258,7 +295,6 @@ static void show() {
 			buf_end_pos += need;
 			break;
 		}
-		pos = strchr(pos, '\n') + 1;
 	}
 	if (footer_display_lines != 2 /*TODO improve statement? */) {
 		addstr("\u251C");
@@ -377,21 +413,94 @@ static void restore_term() {
 static inline void init_acts();
 static void act_next_world(unsigned);
 
-static void refill_world() {
-
-	// TODO implement
+static int refill_world() {
+	lseek(data_in, world_off, SEEK_SET);
+	world_data_size = 0;
+	while (390) {
+		size_t r = read(data_in, world_data + world_data_size,
+				world_data_max_size - world_data_size);
+		if (r <= 0) {
+			if (errno == EINTR) {
+				continue;
+			}
+			break;
+		}
+		char *c = memchr(world_data + world_data_size, FF_C, r);
+		if (c) {
+			if (c + 1 < world_data + world_data_size + r && c[1] == EM_C) {
+				++c;
+			}
+			world_data_size = c + 1 - world_data;
+			break;
+		} else if (world_data[0] == EM_C) {
+			world_data_size = r;
+			return -1;
+		}
+		world_data_size += r;
+		if (world_data_size == world_data_max_size) {
+			world_data = realloc(world_data, world_data_max_size <<= 1);
+			if (!world_data) {
+				perror("realloc");
+				exit(EXIT_FAILURE);
+			}
+		}
+	}
 	min_pos.x = min_pos.y = max_pos.x = max_pos.y = 0;
+	char *c = memchr(world_data, STX_C, world_data_size), *end = world_data;
+	if (c) {
+		c++;
+		end = memchr(c, ETX_C, world_data + world_data_size - c);
+		if (!end)
+			end = memchr(c, EOT_C, world_data + world_data_size - c);
+		if (!end)
+			end = world_data + world_data_size;
+		while (422) {
+			char *eol = memchr(c, '\n', end - c);
+			char *lend = eol ? eol - 1 : end;
+			size_t chars;
+			text_end(c, rbuf_end_pos, c - eol, &chars);
+			if (chars > max_pos.x) {
+				max_pos.x = chars;
+			}
+			if (!eol) {
+				break;
+			}
+			max_pos.y++;
+			c = eol + 1;
+		}
+	}
+	end = memchr(end, EOT_C, world_data + world_data_size - end);
+	if (end) {
+		ssize_t remain = world_data + world_data_size - end;
+		if (--remain > 0) {
+			if (remain > sizeof(pos2)) {
+				fprintf(stderr,
+						"well, I don't know what to do with the extra data.\n");
+				remain = sizeof(pos2);
+			}
+			memcpy(&min_pos, end + 1, remain);
+			max_pos.x += min_pos.x;
+			max_pos.y += min_pos.y;
+		}
+	}
 	recalc_header_footer_sizes();
+	return 0;
 }
 
 int start_solve(void *arg) {
 	solve(arg);
+	fputs(STEP_ALL_FINISHED, solution_out);
+	fflush(solution_out);
+	fclose(solution_out);
 	return 0;
 }
 
-void interact(char *path) {
+void interact(char *path, int force_interactive) {
 	puzzle_file = path;
 #ifndef __unix__
+	if (!force_interactive) {
+		return;
+	}
 	fprintf(stderr, "non POSIX systems are not completely supported\n");
 	in = stdin;
 	out = stderr;
@@ -412,10 +521,6 @@ void interact(char *path) {
 		exit(EXIT_FAILURE);
 	}
 	orig_term = term;
-	if (atexit(restore_term)) {
-		perror("atexit(restore_term)");
-		exit(EXIT_FAILURE);
-	}
 	term.c_iflag &= ~(IGNBRK | INPCK | ISTRIP);
 	term.c_iflag |= IGNPAR | ICRNL;
 #	ifdef IUTF8
@@ -430,7 +535,8 @@ void interact(char *path) {
 	term.c_cc[VMIN] = 0;
 	if (tcsetattr(in, TCSAFLUSH, &term)) {
 		perror("tcsatattr(stdin)");
-		exit(EXIT_FAILURE);
+		errno = 0;
+		return;
 	}
 	char *nam = ttyname(in);
 	if (!nam) {
@@ -441,9 +547,9 @@ void interact(char *path) {
 	if (out < 0) {
 		fprintf(stderr, "failed to open(%s, WRONLY): %s\n", nam,
 				strerror(errno));
+		tcsetattr(in, TCSAFLUSH, &orig_term);
 		exit(EXIT_FAILURE);
 	}
-	dprintf(out, "initilized terminal\n");
 #endif // __unix__
 	buf_capacity = 1024;
 	buf = malloc(buf_capacity);
@@ -457,12 +563,27 @@ void interact(char *path) {
 		perror("malloc");
 		exit(EXIT_FAILURE);
 	}
+	if (update_display_size(!force_interactive) || atexit(restore_term)) {
+		free(world_data);
+		free(buf);
+		free(rbuf);
+#ifdef __unix__
+		tcsetattr(in, TCSAFLUSH, &orig_term);
+		if (in != STDIN_FILENO)
+#else
+		if (in != stdin)
+#endif
+			close(in);
+		close(out);
+		return;
+	}
+	interactive = 1;
+	dprintf(out, "initilized terminal\n");
 	dprintf(out,
 			HIDE_CURSOR RESET //
 			TITLE(Advent of Code 2024 day %d part %d (%s)), day, part,
 			puzzle_file);
 	init_acts();
-	update_display_size();
 	solution_out = fopen(data_file, "wb");
 #ifdef __unix__
 	data_in = open(data_file, O_RDONLY);
@@ -470,11 +591,15 @@ void interact(char *path) {
 	data_in = fopen(data_file, "rb");
 #endif // __unix__
 #ifdef __STDC_NO_THREADS__
-	printf("no threads are supported, wait a little, until I solved the puzzle\n");
+	printf("no threads are supported, you have to wait a until I solved the puzzle\n");
 	solve(puzzle_file);
 #else // __STDC_NO_THREADS__
 	thrd_create(&thrd, start_solve, puzzle_file);
+	struct timespec wait = { .tv_nsec = 1000000 /* 10ms */};
+	thrd_sleep(&wait, 0); /* give the solver a little time */
 #endif // __STDC_NO_THREADS__
+	world_data = malloc(1024);
+	world_data_max_size = 1024;
 	refill_world();
 	if (rbuf_pos != rbuf_end_pos) {
 		read_command();
@@ -510,7 +635,7 @@ void interact(char *path) {
 	}
 }
 
-static size_t timeout_read(time_t start, size_t add_off) {
+static ssize_t timeout_read(time_t start, size_t add_off, int allow_fail) {
 	while (375) {
 		ssize_t r = read(in, rbuf + rbuf_end_pos + add_off,
 				rbuf_capacity - rbuf_end_pos - add_off);
@@ -525,6 +650,9 @@ static size_t timeout_read(time_t start, size_t add_off) {
 			errno = 0;
 		}
 		if (difftime(time(0), start) >= 2.0) {
+			if (allow_fail) {
+				return -1;
+			}
 			writestr(out, "\nfailed to update the terminal size!\n");
 			exit(EXIT_FAILURE);
 		} else {
@@ -535,31 +663,42 @@ static size_t timeout_read(time_t start, size_t add_off) {
 	}
 }
 
-static inline size_t cond_timeout_read(size_t r, time_t start, size_t o) {
+static inline ssize_t cond_timeout_read(size_t r, time_t start, size_t o,
+		int allow_fail) {
 	if (o >= r) {
-		r += timeout_read(start, o);
+		ssize_t r2 = timeout_read(start, o, allow_fail);
+		if (r2 < 0) {
+			return r2;
+		}
+		r += r2;
 	}
 	return r;
 }
 
-static void update_display_size() {
+static int update_display_size(int allow_fail) {
 	writestr(out, CURSOR_SET(9999, 9999) CURSOR_GET);
 	time_t start = time(0);
 	while (113) {
 		ensure_rbuf(16, 0);
-		size_t r = timeout_read(start, 0);
-		for (size_t o = 0; o < r; o++) {
+		ssize_t r = timeout_read(start, 0, allow_fail);
+		if (r < 0) {
+			return -1;
+		}
+		for (ssize_t o = 0; o < r; o++) {
 			size_t start_o = o;
 			if (rbuf[rbuf_end_pos + o] != ESC_C) {
 				continue;
 			}
-			r = cond_timeout_read(r, start, ++o);
+			r = cond_timeout_read(r, start, ++o, allow_fail);
+			if (r < 0) {
+				return -1;
+			}
 			if (rbuf[rbuf_end_pos + o] != '[') {
 				continue;
 			}
 			size_t nl = 0, nc = 0;
 			for (o++;
-					o < (r = cond_timeout_read(r, start, o))
+					o < (r = cond_timeout_read(r, start, o, allow_fail))
 							&& isdigit(rbuf[rbuf_end_pos + o]); o++) {
 				size_t nnl = nl * 10;
 				nnl += rbuf[rbuf_end_pos + o] - '0';
@@ -568,11 +707,14 @@ static void update_display_size() {
 				}
 				nl = nnl;
 			}
+			if (r < 0) {
+				return -1;
+			}
 			if (rbuf[rbuf_end_pos + o] != ';' || !nl) {
 				continue;
 			}
 			for (o++;
-					o < (r = cond_timeout_read(r, start, o))
+					o < (r = cond_timeout_read(r, start, o, allow_fail))
 							&& isdigit(rbuf[rbuf_end_pos + o]); o++) {
 				size_t nnc = nc * 10;
 				nnc += rbuf[rbuf_end_pos + o] - '0';
@@ -580,6 +722,9 @@ static void update_display_size() {
 					break;
 				}
 				nc = nnc;
+			}
+			if (r < 0) {
+				return -1;
 			}
 			if (rbuf[rbuf_end_pos + o] != 'R' || !nc) {
 				continue;
@@ -609,8 +754,10 @@ static void update_display_size() {
 				rbuf_end_pos += r - o;
 			}
 			rbuf_end_pos += start_o;
-			recalc_header_footer_sizes();
-			return;
+			if (world_data) {
+				recalc_header_footer_sizes();
+			}
+			return 0;
 		}
 		rbuf_end_pos += r;
 	}
@@ -724,12 +871,17 @@ static void act_next_world(unsigned flags) {
 		count = 10;
 	else
 		count = 1;
-	int i;
-	for (i = 0; i < count; ++i) {
-
-	}
-	if (i) { // no need to refill the world if there is none
-		refill_world();
+	for (int i = 0; i < count; ++i, ++world_idx) {
+		off_t last_off = world_off;
+		if (world_data_size && world_data[world_data_size - 1] == EM_C) {
+			break;
+		}
+		world_off += world_data_size;
+		if (refill_world()) {
+			world_off = last_off;
+			refill_world();
+			break;
+		}
 	}
 }
 
@@ -749,8 +901,12 @@ static void act_prev_world(unsigned flags) {
 static void act_clear(unsigned flags) {
 	addstr(ERASE_COMPLETE_DISPLAY);
 	write_buf();
-	update_display_size();
-	if ((flags & (FLAG_CTRL | FLAG_SHIFT)) == (FLAG_CTRL | FLAG_SHIFT)) {
+	update_display_size(0);
+	if (flags & FLAG_ALT) {
+		if (flags & FLAG_SHIFT) {
+			world_idx = 0;
+			world_off = 0;
+		}
 		refill_world();
 	}
 }
@@ -929,10 +1085,17 @@ static void init_acts() {
 			"reprint the screen and remove all cached worlds");
 	bind_action(ESC "c", clear, FLAG_ALT, "Alt+C:\n"
 			"remove all cached worlds");
+
+	incomp_action(ESC);
+	incomp_action(ESC "[");
+	incomp_action(ESC "[9");
+	incomp_action(ESC "[99");
+	incomp_action(ESC "[99;");
+	incomp_action(ESC "[99;8");
 	bind_action(ESC "[99;8u", clear, FLAG_SHIFT | FLAG_CTRL | FLAG_ALT,
 			"Shift+Ctrl+Alt+C:\n"
-					"remove all cached worlds and set the current "
-					"world to 0");
+					"reread the world\n"
+					"and set the current world to 0");
 
 	bind_action("\010", help, FLAG_CTRL, "Crlt+H:\n"
 			"print the help");
@@ -962,8 +1125,6 @@ static void init_acts() {
 	bind_action(ESC "d", right, FLAG_ALT, "Alt+D:\n"
 			"go 100 right");
 
-	incomp_action(ESC);
-	incomp_action(ESC "[");
 	incomp_action(ESC "[1");
 	incomp_action(ESC "[1;");
 	incomp_action(ESC "[1;2");

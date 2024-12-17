@@ -12,12 +12,6 @@
 
 #include "color.h"
 #include "control.h"
-#include <stdio.h>
-
-struct coordinate {
-	size_t x;
-	size_t y;
-};
 
 #ifndef INTERACTIVE
 #define STEP_HEADER       ""
@@ -37,11 +31,13 @@ struct coordinate {
 /* finish transferring text, now comes some optional data or STEP_FINISHED
  * 1: struct coordinate world_min_coordinate (defaults to (0|0))
  * if  */
-#define STEP_FIN_TEXT     ETX
+#define STEP_FIN_TEXT     EOT
+/* marks the end of the current step */
 #define STEP_FINISHED     FF
+/* marks the end of all steps, automatically send by the interactive wrapper */
 #define STEP_ALL_FINISHED EM
 
-void interact(char *path);
+void interact(char *path, int force_interactive);
 
 #endif // INTERACTIVE
 

@@ -25,6 +25,7 @@ void* reallocarray(void*ptr, size_t nmemb, size_t size);
 extern int day;
 extern int part;
 extern FILE *solution_out;
+extern int interactive;
 #endif
 
 char* u64toa(uint64_t);
