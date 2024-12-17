@@ -54,6 +54,20 @@ struct data {
 };
 
 static int do_print = 1;
+static int print_opcodes = 0;
+
+typedef num (*opcode)(struct data*, int);
+
+static num op_0(struct data*, int);
+static num op_1(struct data*, int);
+static num op_2(struct data*, int);
+static num op_3(struct data*, int);
+static num op_4(struct data*, int);
+static num op_5(struct data*, int);
+static num op_6(struct data*, int);
+static num op_7(struct data*, int);
+
+static opcode opcodes[] = { op_0, op_1, op_2, op_3, op_4, op_5, op_6, op_7 };
 
 static void print(FILE *str, struct data *data, uint64_t result) {
 	if (result) {
@@ -82,6 +96,7 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 		if (!(*i & 1) && i + 1 < end) {
 			opcodes[*i](data, i[1]);
 		}
+		fputc('\n', str);
 	}
 	print_opcodes = 0;
 	if (data->out) {
@@ -228,12 +243,53 @@ static num op_7(struct data *data, int operant) {
 	return data->ip += 2;
 }
 
-typedef num (*opcode)(struct data*, int);
+static num min(num length) {
+	return UINT64_C(1) << ((length - 1) * 3);
+}
 
-static opcode opcodes[] = { op_0, op_1, op_2, op_3, op_4, op_5, op_6, op_7 };
+static num max(num length) {
+	return (UINT64_C(1) << (length * 3)) - 1;
+}
 
-const char* solve(const char *path) {
-	struct data *data = read_data(path);
+static int outlen(num a) {
+	int result = 0;
+	while ((a & (UINT64_C(1) << (result * 3)) - 1) != a) {
+		result++;
+	}
+	return result;
+}
+
+static int find(num a, num index) {
+	a >>= index * 3;
+	num b = (a & 7) ^ 2;
+	num c = a / (1 << b);
+	return (b ^ 3 ^ c) & 7;
+}
+
+static num build(num a, int index, const char *value) {
+	int shift = index * 3;
+	if (a & ((UINT64_C(1) << (index + 3)) - 1)) {
+		puts("ERROR 272");
+		exit(2);
+	}
+	a >>= shift;
+	for (int i = 0; i <= 7; ++i) {
+		if (find(a | i, 0) == *value) {
+			if (index) {
+				num na = (a | i) << shift;
+				num result = build(na, index - 1, value - 1);
+				if (result) {
+					return result;
+				}
+			} else {
+				return a | i;
+			}
+		}
+	}
+	return 0;
+}
+
+const char* solvep1(struct data *data) {
 	uint64_t result = 0;
 	num ip = 0;
 	int olen;
@@ -265,6 +321,26 @@ const char* solve(const char *path) {
 		res[i] = find(data->regs[0], i);
 	}
 	res[data->out_size] = 0;
+	return res;
+}
+
+const char* solvep2(struct data *data) {
+	num result = 0;
+	size_t start_index = data->inst_size - 1;
+	const char *start_ptr = data->instructions + start_index;
+	result = build(result, start_index, start_ptr);
+	return u64toa(result);
+}
+
+const char* solve(const char *path) {
+	struct data *data = read_data(path);
+	uint64_t result = 0;
+	const char *res = 0;
+	if (part == 1) {
+		res = solvep1(data);
+	} else {
+		res = solvep2(data);
+	}
 	/* remember to free in order to avoid a memory leak in interactive mode */
 	free(data->instructions);
 	if (data->out) {
