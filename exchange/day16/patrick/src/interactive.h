@@ -12,18 +12,19 @@
 
 #include "color.h"
 
-#define STEP_HEADER_C SOH_C
-#define STEP_HEADER   SOH
-#define STEP_BODY_C STX_C
-#define STEP_BODY   STX
-#define STEP_FOOTER_C ETX_C
-#define STEP_FOOTER   ETX
-#define STEP_FINISHED_C EOT_C
-#define STEP_FINISHED   EOT
-#define STEP_ALL_FINISHED_C EM_C
-#define STEP_ALL_FINISHED   EM
+#ifndef INTERACTIVE
+#define STEP_HEADER       ""
+#define STEP_BODY         ""
+#define STEP_FOOTER       ""
+#define STEP_FINISHED     ""
+#define STEP_ALL_FINISHED ""
+#else
+#define STEP_HEADER       SOH
+#define STEP_BODY         STX
+#define STEP_FOOTER       ETX
+#define STEP_FINISHED     FF
+#define STEP_ALL_FINISHED EM
 
-#ifdef INTERACTIVE
 #include "term.h"
 
 #include <stddef.h>
