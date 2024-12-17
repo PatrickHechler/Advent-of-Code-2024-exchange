@@ -2,13 +2,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Scanner;
-import java.util.Set;
 
 /**
  * see: https://adventofcode.com/2024/day/17
@@ -45,7 +40,7 @@ public class Y24Day17 {
 		public CPU createCopy(long newA) {
 			return new CPU(newA, B, C, PROG);
 		}
-		public boolean exec() {
+		public boolean exec(boolean debug) {
 			if ((ip<0) || (ip>=PROG.length)) {
 				return false;
 			}
@@ -54,7 +49,9 @@ public class Y24Day17 {
 			int arg = PROG[ip+1];
 			ip += 2;
 			OPCODE opc = OPCODE.values()[code];
-//			System.out.println("  EXEC "+opc+" "+arg);
+			if (debug) {
+				System.out.println("  EXEC "+opc+" "+arg);
+			}
 			switch (opc) {
 			case ADV:
 				A = A / (1 << combo(arg));
@@ -74,7 +71,7 @@ public class Y24Day17 {
 				B = B ^ C;
 				break;
 			case OUT:
-				out(combo(arg));
+				out(combo(arg), debug);
 				if (OUT.length()>100) {
 					return false;
 				}
@@ -90,8 +87,10 @@ public class Y24Day17 {
 			}
 			return true;
 		}
-		private void out(int value) {
-//			System.out.println("OUT["+value+"]");
+		private void out(int value, boolean debug) {
+			if (debug) {
+				System.out.println("  OUT["+value+"]");
+			}
 			if (!OUT.isEmpty()) {
 				OUT.append(",");
 			}
@@ -147,7 +146,7 @@ public class Y24Day17 {
 				System.out.println("---------------------");
 				CPU cpu = new CPU(a,b,c, prog);
 				System.out.println(cpu.toString());
-				while(cpu.exec()) {
+				while(cpu.exec(true)) {
 					System.out.println(cpu.toString());
 				}
 				System.out.println(cpu.getOutput());
@@ -159,6 +158,30 @@ public class Y24Day17 {
 	}
 
 
+	public static String run(CPU cpuTemplate, long A) {
+		CPU cpu = cpuTemplate.createCopy(A);
+		while (cpu.exec(false)) {}
+		return cpu.getOutput();
+	}
+
+	public static List<Long> recursiveSearchA(CPU cpuTemplate, String searchString) {
+		if (searchString.equals("")) {
+			return Arrays.asList(0L);
+		}
+		List<Long> result = new ArrayList<>();
+		List<Long> possibleAs = recursiveSearchA(cpuTemplate, searchString.substring(Math.min(searchString.length(), 2)));
+		for (long possibleA:possibleAs) {
+			for (long a=0; a<=7; a++) {
+				if (run(cpuTemplate, (possibleA<<3)+a).equals(searchString)) {
+					result.add((possibleA<<3)+a);
+				}
+			}
+		}
+		System.out.println("FOUND for "+searchString+": "+result);
+		return result;
+	}
+	
+	
 
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
 
@@ -175,8 +198,8 @@ public class Y24Day17 {
 					prog[i] = Integer.parseInt(strProg[i]);
 				}
 				System.out.println("---------------------");
-				CPU cpu = new CPU(0,b,c, prog);
-				List<Long> results = recursiveSearchA(cpu, program);
+				CPU cpuTemplate = new CPU(0,b,c, prog);
+				List<Long> results = recursiveSearchA(cpuTemplate, program);
 				System.out.println(results.stream().reduce(Long.MAX_VALUE, Long::min));
 
 			
@@ -185,6 +208,7 @@ public class Y24Day17 {
 		}
 	}
 
+	/*
 
 	public static String padl(String txt, char padChar, int len) {
 		String result = txt;
@@ -193,13 +217,6 @@ public class Y24Day17 {
 		}
 		return result;
 	}
-	
-	public static String run(CPU cpuTemplate, long A) {
-		CPU cpu = cpuTemplate.createCopy(A);
-		while (cpu.exec()) {}
-		return cpu.getOutput();
-	}
-
 	
 	public static String run(long A) {
 		StringBuilder result = new StringBuilder(); 
@@ -243,23 +260,7 @@ public class Y24Day17 {
 		return result.toString(); 
 	}
 
-	
-	public static List<Long> recursiveSearchA(CPU cpu, String searchString) {
-		if (searchString.equals("")) {
-			return Arrays.asList(0L);
-		}
-		List<Long> result = new ArrayList<>();
-		List<Long> possibleAs = recursiveSearchA(cpu, searchString.substring(Math.min(searchString.length(), 2)));
-		for (long possibleA:possibleAs) {
-			for (long a=0; a<=7; a++) {
-				if (run(cpu, (possibleA<<3)+a).equals(searchString)) {
-					result.add((possibleA<<3)+a);
-				}
-			}
-		}
-		System.out.println("FOUND for "+searchString+": "+result);
-		return result;
-	}
+	*/
 	
 	/*
 	A: 000000 -> 6
@@ -344,6 +345,8 @@ public class Y24Day17 {
 	
 	*/
 
+	/*
+	
 	// 2,4,1,3,7,5,1,5,0,3,4,3,5,5,3,0
 	public static void test_manual() {
 		int A=0b001011100;
@@ -414,6 +417,8 @@ public class Y24Day17 {
 			}
 		}
 	}
+	
+	*/
 
 	
 	public static void main(String[] args) throws FileNotFoundException {
