@@ -53,7 +53,7 @@ public class Y24Day17 {
 			System.out.println("  EXEC "+opc+" "+arg);
 			switch (opc) {
 			case ADV:
-				A = A / (1 << arg);
+				A = A / (1 << combo(arg));
 				break;
 			case BXL:
 				B = B ^ arg;
@@ -73,10 +73,10 @@ public class Y24Day17 {
 				out(combo(arg));
 				break;
 			case BDV:
-				B = A / (1 << arg);
+				B = A / (1 << combo(arg));
 				break;
 			case CDV:
-				C = A / (1 << arg);
+				C = A / (1 << combo(arg));
 				break;
 			default:
 				throw new RuntimeException("unknow opcode "+opc+" for code "+code);
@@ -116,7 +116,7 @@ public class Y24Day17 {
 		}
 		@Override
 		public String toString() {
-			return "CPU["+ip+"|"+A+","+B+","+C+"]";
+			return "CPU["+ip+"|"+Integer.toString(A, 16)+","+Integer.toString(B, 16)+","+Integer.toString(C, 16)+"|"+A+","+B+","+C+"|"+"]";
 		}
 	}
 	
@@ -130,7 +130,6 @@ public class Y24Day17 {
 				int c = Integer.parseInt(scanner.nextLine().trim().replaceFirst(REGISTER_RX, "$2"));
 				scanner.nextLine();
 				String[] strProg = scanner.nextLine().trim().replaceFirst(PROGRAM_RX, "$1").split(",");
-				scanner.nextLine();
 				int[] prog = new int[strProg.length];
 				for (int i=0; i<strProg.length; i++) {
 					prog[i] = Integer.parseInt(strProg[i]);
@@ -142,6 +141,9 @@ public class Y24Day17 {
 					System.out.println(cpu.toString());
 				}
 				System.out.println(cpu.getOutput());
+				if (scanner.hasNext()) {
+					scanner.nextLine();
+				}
 			}
 		}
 	}
@@ -156,8 +158,8 @@ public class Y24Day17 {
 	public static void main(String[] args) throws FileNotFoundException {
 		System.out.println("--- PART I  ---");
 //		mainPart1("exchange/day17/feri/input-example.txt");
-		mainPart1("exchange/day17/feri/input-example-2.txt");
-//		mainPart1("exchange/day17/feri/input.txt");     // not 6,3,3,3,4,0,0,0,4
+//		mainPart1("exchange/day17/feri/input-example-2.txt");
+		mainPart1("exchange/day17/feri/input.txt");     // not 6,3,3,3,4,0,0,0,4
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
