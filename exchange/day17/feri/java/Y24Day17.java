@@ -128,12 +128,14 @@ public class Y24Day17 {
 				int a = Integer.parseInt(scanner.nextLine().trim().replaceFirst(REGISTER_RX, "$2"));
 				int b = Integer.parseInt(scanner.nextLine().trim().replaceFirst(REGISTER_RX, "$2"));
 				int c = Integer.parseInt(scanner.nextLine().trim().replaceFirst(REGISTER_RX, "$2"));
-				scanner.nextLine().trim();
+				scanner.nextLine();
 				String[] strProg = scanner.nextLine().trim().replaceFirst(PROGRAM_RX, "$1").split(",");
+				scanner.nextLine();
 				int[] prog = new int[strProg.length];
 				for (int i=0; i<strProg.length; i++) {
 					prog[i] = Integer.parseInt(strProg[i]);
 				}
+				System.out.println("---------------------");
 				CPU cpu = new CPU(a,b,c, prog);
 				System.out.println(cpu.toString());
 				while(cpu.exec()) {
@@ -154,7 +156,8 @@ public class Y24Day17 {
 	public static void main(String[] args) throws FileNotFoundException {
 		System.out.println("--- PART I  ---");
 //		mainPart1("exchange/day17/feri/input-example.txt");
-		mainPart1("exchange/day17/feri/input.txt");     // not 6,3,3,3,4,0,0,0,4
+		mainPart1("exchange/day17/feri/input-example-2.txt");
+//		mainPart1("exchange/day17/feri/input.txt");     // not 6,3,3,3,4,0,0,0,4
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
