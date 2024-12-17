@@ -96,7 +96,6 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 		if (!(*i & 1) && i + 1 < end) {
 			opcodes[*i](data, i[1]);
 		}
-		fputc('\n', str);
 	}
 	print_opcodes = 0;
 	if (data->out) {
