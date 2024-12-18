@@ -59,7 +59,13 @@ static int do_print = 1;
 
 static void print(FILE *str, struct data *data, uint64_t result) {
 	if (result) {
-		fprintf(str, STEP_HEADER "result=%s\n" STEP_BODY, u64toa(result));
+		if (part == 1) {
+			fprintf(str, STEP_HEADER "result=%s\n" STEP_BODY, u64toa(result));
+		} else {
+			fprintf(str, STEP_HEADER "result=%s : "NUMF","NUMF"\n" STEP_BODY,
+					u64toa(result), data->bytes[result - 1].x,
+					data->bytes[result - 1].y);
+		}
 	} else {
 		fputs(STEP_BODY, str);
 	}
@@ -73,18 +79,9 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 	fputs(STEP_FINISHED, str);
 }
 
-const char* solve(const char *path) {
-	struct data *data = read_data(path);
-	uint64_t result = 0;
-	size_t count = 1024;
-	if (data->bytes_size < count) {
-		count = 12; // sample data
-		data->max_pos.x = 6;
-		data->max_pos.y = 6;
-	}
+static uint64_t solvep1(struct data *data, size_t count) {
 	const num xcount = data->max_pos.x + 1, ycount = data->max_pos.y + 1;
-	data->memory = malloc(xcount * ycount);
-	memset(data->memory, '.', xcount * ycount);
+	uint64_t result = 0;
 	for (num i = 0; i < count; ++i) {
 		struct pos *p = data->bytes + i;
 		data->memory[p->x + (xcount * p->y)] = '#';
@@ -98,6 +95,7 @@ const char* solve(const char *path) {
 				char c = data->memory[x + (xcount * y)];
 				if (c != 'O')
 					continue;
+
 				if (x && data->memory[x - 1 + (xcount * y)] == '.') {
 					data->memory[x - 1 + (xcount * y)] = 'o';
 				}
@@ -120,6 +118,74 @@ const char* solve(const char *path) {
 				data->memory[i] = 'O';
 			}
 		}
+	}
+	return result;
+}
+
+static uint64_t solvep2(struct data *data, size_t count) {
+	const num xcount = data->max_pos.x + 1, ycount = data->max_pos.y + 1;
+	uint64_t result = 0;
+	data->memory[0] = 'O';
+	while (122) {
+		struct pos *b = data->bytes + result;
+		result++;
+		data->memory[b->x + (xcount * b->y)] = '#';
+		int done;
+		do {
+			done = 0;
+			for (num y = 0; y < ycount; ++y) {
+				for (num x = 0; x < xcount; ++x) {
+					char c = data->memory[x + (xcount * y)];
+					if (c != 'O')
+						continue;
+					if (x && data->memory[x - 1 + (xcount * y)] == '.') {
+						data->memory[x - 1 + (xcount * y)] = 'O';
+						done = 137;
+					}
+					if (x + 1 < xcount
+							&& data->memory[x + 1 + (xcount * y)] == '.') {
+						data->memory[x + 1 + (xcount * y)] = 'O';
+						done = 137;
+					}
+					if (y && data->memory[x + (xcount * (y - 1))] == '.') {
+						data->memory[x + (xcount * (y - 1))] = 'O';
+						done = 137;
+					}
+					if (y + 1 < ycount
+							&& data->memory[x + (xcount * (y + 1))] == '.') {
+						data->memory[x + (xcount * (y + 1))] = 'O';
+						done = 137;
+					}
+				}
+			}
+		} while (done && data->memory[xcount * ycount - 1] != 'O');
+		print(solution_out, data, result);
+		if (!done)
+			return result;
+		for (num i = 1; i < xcount * ycount; ++i) {
+			if (data->memory[i] == 'O') {
+				data->memory[i] = '.';
+			}
+		}
+	}
+}
+
+const char* solve(const char *path) {
+	struct data *data = read_data(path);
+	uint64_t result = 0;
+	size_t count = 1024;
+	if (data->bytes_size < count) {
+		count = 12; // sample data
+		data->max_pos.x = 6;
+		data->max_pos.y = 6;
+	}
+	const num xcount = data->max_pos.x + 1, ycount = data->max_pos.y + 1;
+	data->memory = malloc(xcount * ycount);
+	memset(data->memory, '.', xcount * ycount);
+	if (part == 1) {
+		result = solvep1(data, count);
+	} else {
+		result = solvep2(data, count);
 	}
 	print(solution_out, data, result);
 	/* remember to free in order to avoid a memory leak in interactive mode */
