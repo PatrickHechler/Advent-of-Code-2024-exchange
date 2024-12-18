@@ -1,9 +1,7 @@
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Scanner;
@@ -41,15 +39,19 @@ public class Y24Day18 {
 
 	public static class World {
 		private Set<Pos> corrupted;
+		private Set<Pos> shortestPath;
 		int sizeX;
 		int sizeY;
 		private Pos startPos;
 		private Pos endPos;
+		private Pos lastCorruptedPos;
 		
 		public World(int sizeX, int sizeY) {
 			corrupted = new HashSet<>();
+			shortestPath = new HashSet<>();
 			startPos = new Pos(0,0);
 			endPos = new Pos(sizeX-1, sizeY-1);
+			lastCorruptedPos = new Pos(-1,-1);
 			this.sizeX = sizeX;
 			this.sizeY = sizeY;
 		}
@@ -66,7 +68,8 @@ public class Y24Day18 {
 			return '.';
 		}
 		public void addCorrupt(int x, int y) {
-			corrupted.add(new Pos(x,y));
+			lastCorruptedPos = new Pos(x,y); 
+			corrupted.add(lastCorruptedPos);
 		}
 		@Override
 		public String toString() {
@@ -75,8 +78,15 @@ public class Y24Day18 {
 			result.append("SHAPE ("+sizeX+","+sizeY+")\n");
 			for (int y=0; y<sizeY; y++) {
 				for (int x=0; x<sizeX; x++) {
+					Pos p = new Pos(x,y);
 					String color = "b0";
-					char c = get(x,y);
+					if (shortestPath.contains(p)) {
+						color = "b2";
+					}
+					if (p.equals(lastCorruptedPos)) {
+						color = "b3";
+					}
+					char c = get(p);
 					if (startPos.eq(x,y)) {
 						c = 'S';
 					}
@@ -112,6 +122,7 @@ public class Y24Day18 {
 			return distances.get(e.pos) != e.dist;
 		}
 		public int calcShortestPath() {
+			shortestPath.clear();
 			distances = new HashMap<>();
 			entries = new PriorityQueue<Entry>((e1,e2)->Integer.compare(e1.dist, e2.dist));
 			addEntry(startPos, 0);
@@ -124,6 +135,7 @@ public class Y24Day18 {
 					continue;
 				}
 				if (e.pos.equals(endPos)) {
+					fillShortestPath(endPos, e.dist);
 					return e.dist;
 				}
 				addEntry(e.pos.up(), e.dist+1);
@@ -132,6 +144,23 @@ public class Y24Day18 {
 				addEntry(e.pos.left(), e.dist+1);
 //				output.addStep(toString());
 			}
+		}
+		private void fillShortestPath(Pos pos, int dist) {
+			if (shortestPath.contains(pos)) {
+				return;
+			}
+			if (!distances.containsKey(pos)) {
+				return;
+			}
+			if (distances.get(pos) != dist) {
+				return;
+			}
+			shortestPath.add(pos);
+			fillShortestPath(pos.up(), dist-1);
+			fillShortestPath(pos.right(), dist-1);
+			fillShortestPath(pos.down(), dist-1);
+			fillShortestPath(pos.left(), dist-1);
+			
 		}
 	}
 
@@ -159,8 +188,8 @@ public class Y24Day18 {
 				}
 			}
 		}
-		output.addStep(world.toString());
 		System.out.println(world.calcShortestPath());
+		output.addStep(world.toString());
 	}
 
 
@@ -170,6 +199,8 @@ public class Y24Day18 {
 
 		output = new Y24GUIOutput18("2024 Day 18 Part 2", true);
 		World world = new World(maxX+1, maxY+1);
+		world.calcShortestPath();
+		output.addStep(world.toString());
 		try (Scanner scanner = new Scanner(new File(inputfile))) {
 			int step=0;
 			while (scanner.hasNext()) {
@@ -180,17 +211,15 @@ public class Y24Day18 {
 				int x = Integer.parseInt(line.replaceFirst(POS_RX, "$1"));
 				int y = Integer.parseInt(line.replaceFirst(POS_RX, "$2"));
 				world.addCorrupt(x, y);
-//				output.addStep(world.toString());
 				step++;
 				int dist = world.calcShortestPath();
+				output.addStep(world.toString());
 				System.out.println(step+": "+line+" "+dist);
 				if (dist == -1) {
 					break;
 				}
 			}
 		}
-		output.addStep(world.toString());
-		System.out.println(world.calcShortestPath());
 	}
 
 
@@ -203,7 +232,7 @@ public class Y24Day18 {
 		System.out.println();
 		System.out.println("--- PART II ---");
 //		mainPart2("exchange/day18/feri/input-example.txt", 6,6);
-		mainPart2("exchange/day18/feri/input.txt", 70,70);    // != 2957
+		mainPart2("exchange/day18/feri/input.txt", 70,70);    
 		System.out.println("---------------");
 	}
 
