@@ -8,9 +8,23 @@
 #ifndef SRC_AOC_H_
 #define SRC_AOC_H_
 
+/* only set AOC_POSIX if not set by the CFLAGS */
+#ifndef AOC_POSIX
+#	if defined __unix__ \
+		|| (defined __FreeBSD__ || defined __NetBSD__ || defined __OpenBSD__ \
+				|| defined __bsdi__ || defined __DragonFly__) \
+		|| defined __CYGWIN__ \
+		|| defined __MINGW32__ \
+		|| (defined __APPLE__ && defined __MACH__)
+#		define AOC_POSIX 1
+#	else
+#		define AOC_POSIX 0
+#	endif
+#endif // AOC_POSIX
+
 #include <stdint.h>
 
-#ifndef __unix__
+#if !AOC_POSIX
 #include <stdio.h>
 #include <stddef.h>
 

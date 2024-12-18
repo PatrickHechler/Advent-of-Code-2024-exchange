@@ -18,24 +18,27 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#ifndef __STDC_NO_THREADS__
+#if AOC_POSIX
+#include <pthread.h>
+#elif defined __STDC_NO_THREADS__
 #include <threads.h>
+#define nanosleep(wait, remain) nanosleep(wait, remain)
 #else
 /* this is OK for here, there no need to repeatedly ask for the time.
  * this function is only used to wait a little before retrying the operation.
  * it may hurt the CPU usage, but it will be a busy sleep anyway, so might as
  * well check if the operation is now available. */
-#define thrd_sleep(wait, remain) ((void)0)
+#define nanosleep(wait, remain) ((void)0)
 #endif
 
-#ifdef __unix__
+#ifdef AOC_POSIX
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
 static int in;
 static int out;
 static int data_in;
-#else // __unix__
+#else // AOC_POSIX
 static FILE *in;
 static FILE *out;
 static FILE *data_in;
@@ -44,7 +47,7 @@ static FILE *data_in;
 #define dprintf(out, ...) fprintf(out, __VA_ARGS__); fflush(out)
 #define close(fd) fclose(fd)
 #define lseek(fd, off, whence) fsseko(fd, off, whence)
-#endif // __unix__
+#endif // AOC_POSIX
 #define writestr(out, str) write(out, str, sizeof(str) - 1)
 #define addstr(str) ensure_buf(sizeof(str) - 1); \
 	memcpy(buf + buf_end_pos, str, sizeof(str) - 1); \
@@ -58,7 +61,9 @@ struct pos2d {
 typedef struct pos2d pos2;
 
 static pos2 cur = { 0, 0 };
-#ifndef __STDC_NO_THREADS__
+#if AOC_POSIX
+pthread_t thrd;
+#elif !defined  __STDC_NO_THREADS__
 thrd_t thrd;
 #endif
 static char *puzzle_file;
@@ -89,29 +94,33 @@ static void write_buf();
 static int ensure_buf(size_t free_space);
 static int ensure_rbuf(size_t free_space, size_t end_allocated_space);
 
-int header_display_lines = 4;
-int footer_display_lines = 2;
-int side_columns = 2;
+static int header_display_lines = 4;
+static int footer_display_lines = 2;
+static int side_columns = 2;
+static int decorations = 1;
 
 static void recalc_header_footer_sizes() {
-	header_display_lines = 4;
-	footer_display_lines = 2;
-	side_columns = 2;
-	if (world_data[0] != SOH_C) {
-		char *end = memchr(world_data, STX_C, world_data_size);
-		if (!end) {
-			header_display_lines++; /* incomplete world */
-			end = world_data + world_data_size;
-		}
+	if (getenv("BORDERLESS")) {
+		header_display_lines = 0;
+		footer_display_lines = 0;
+		side_columns = 0;
+		decorations = 0;
+	} else {
+		header_display_lines = 4;
+		footer_display_lines = 2;
+		side_columns = 2;
+		decorations = 1;
+	}
+	char *end = memchr(world_data, STX_C, world_data_size);
+	if (!end || (end != world_data && world_data[0] != SOH_C)) {
+		header_display_lines++; /* incomplete world */
+		end = world_data + world_data_size;
+	}
+	if (world_data[0] != STX_C) {
 		char *p = world_data;
-		if (p + 1 < end) {
-			while (100) {
-				++header_display_lines;
-				p = memchr(p + 1, '\n', world_data + world_data_size - p);
-				if (!p) {
-					break;
-				}
-			}
+		while (p && p + 1 < end) {
+			++header_display_lines;
+			p = memchr(p + 1, '\n', end - p);
 		}
 	} else if (world_data[0] != SOH_C) {
 		header_display_lines++;
@@ -143,7 +152,7 @@ static char* text_end(char *c, size_t len, size_t max_text, size_t *real_text) {
 		char *c2 = memchr(c, ESC_C, min_len);
 		if (!c2) {
 			if (real_text)
-				*real_text = rt;
+				*real_text = rt + len;
 			return c + min_len;
 		}
 		len -= c2 - c;
@@ -170,14 +179,16 @@ static char* text_end(char *c, size_t len, size_t max_text, size_t *real_text) {
 			--c;
 			break;
 		}
-		if (*c != 'm' && !len) {
+		if (!len) {
 			if (real_text)
 				*real_text = rt;
 			return c2;
 		}
+		++c;
+		--len;
 	}
 	if (real_text)
-		*real_text = rt;
+		*real_text = rt + len;
 	return c + len;
 }
 
@@ -186,29 +197,37 @@ static void show() {
 	if (world_data_size && world_data[world_data_size - 1] == EM_C) {
 		add_str = " last";
 	}
-	int add = snprintf(buf + buf_end_pos, buf_capacity - buf_end_pos,
-			RESET CURSOR_UP_ONE FRMT_CURSOR_FORWARD ERASE_START_OF_DISPLAY
-			CURSOR_START_OF_DISPLAY
-			"day %d part %d on file %s (world %ld%s)\n"
-			"world: min: (%ld, %ld), max: (%ld, %ld)\n" //
-			"shown: min: (%ld, %ld), max: (%ld, %ld)\n", display_sizes.x - 1, //
-			day, part, puzzle_file, world_idx, add_str, /* line 1 */
-			min_pos.y, min_pos.x, max_pos.y, max_pos.x, /* line 2 */
-			cur.y, cur.x,
-			cur.y + display_sizes.y - 1 - header_display_lines
-					- footer_display_lines,
-			cur.x + display_sizes.x - 1 - side_columns/* line 3 */);
-	if (ensure_buf(add)) {
-		show();
-		return;
+	if (decorations) {
+		int add = snprintf(buf + buf_end_pos, buf_capacity - buf_end_pos,
+				RESET
+				FRMT_CURSOR_SET ERASE_START_OF_DISPLAY CURSOR_START_OF_DISPLAY
+				"day %d part %d on file %s (world %ld%s)\n"
+				"world: min: (%ld, %ld), max: (%ld, %ld)\n" //
+				"shown: min: (%ld, %ld), max: (%ld, %ld)\n",//
+				display_sizes.y - 1,
+				display_sizes.x, //
+				day, part, puzzle_file, world_idx, add_str, /* line 1 */
+				min_pos.y, min_pos.x, max_pos.y, max_pos.x, /* line 2 */
+				cur.y, cur.x,
+				cur.y + display_sizes.y - 1 - header_display_lines
+						- footer_display_lines,
+				cur.x + display_sizes.x - 1 - side_columns/* line 3 */);
+		if (ensure_buf(add)) {
+			show();
+			return;
+		}
+		buf_end_pos += add;
+	} else {
+		addstr(RESET ERASE_COMPLETE_DISPLAY CURSOR_START_OF_DISPLAY);
 	}
 	int warned_corrupt_world = 0;
-	buf_end_pos += add;
 	/* the solution data must not use fancy terminal control sequences, they
 	 * are only here allowed, the solution data may use color/similar control
 	 * sequences */
 	char *pos = world_data;
-	if (pos[0] == SOH_C && pos[1] != STX_C) {
+	if (*pos == SOH_C) {
+		if (*pos == SOH_C)
+			++pos;
 		char *end = memchr(pos, STX_C, world_data_size);
 		if (!end && !warned_corrupt_world) {
 			addstr(FC_RED "the world seems to be incomplete\n" FC_DEF);
@@ -220,12 +239,16 @@ static void show() {
 			char *eol = memchr(pos, '\n', end - pos);
 			if (!eol)
 				eol = end;
-			char *end = text_end(pos, eol - pos, display_sizes.x - side_columns,
-					0);
-			int len = end - pos;
-			/* if the header line is too long, just truncate it */
-			int need = snprintf(buf, buf_capacity - buf_end_pos, "%.*s\n", len,
-					pos);
+			char *print_end = text_end(pos, eol - pos,
+					display_sizes.x - side_columns, 0);
+			int len = print_end - pos;
+			int need;
+			do {
+				/* if the header line is too long, just truncate it */
+				need = snprintf(buf + buf_end_pos, buf_capacity - buf_end_pos,
+						"%.*s\n", len, pos);
+			} while (ensure_buf(need));
+			buf_end_pos += need;
 			pos = eol + 1;
 		}
 		pos = end;
@@ -239,11 +262,13 @@ static void show() {
 		addstr(FC_RED "the world seems to be incomplete\n" FC_DEF);
 		warned_corrupt_world = 1;
 	}
-	addstr("\u250C");
-	for (size_t i = 1; i < display_sizes.x - 1; ++i) {
-		addstr("\u2500");
+	if (decorations) {
+		addstr("\u250C");
+		for (size_t i = 1; i < display_sizes.x - 1; ++i) {
+			addstr("\u2500");
+		}
+		addstr("\u2510");
 	}
-	addstr("\u2510");
 	char *end = memchr(pos, ETX_C, world_data + world_data_size - pos);
 	if (!end)
 		end = memchr(pos, EOT_C, world_data + world_data_size - pos);
@@ -259,9 +284,8 @@ static void show() {
 	for (size_t l = 0;
 			l < display_sizes.y - header_display_lines - footer_display_lines;
 			++l) {
-		addstr("\u2502");
-		if (side_columns != 2) {
-			exit(EXIT_FAILURE);
+		if (decorations) {
+			addstr("\u2502");
 		}
 		if (l + cur.y <= max_pos.y) {
 			char *eol = memchr(pos, '\n', end - pos);
@@ -275,40 +299,47 @@ static void show() {
 				char *e = text_end(pos, eol - pos,
 						display_sizes.x - side_columns, 0);
 				size_t need = e - pos;
-				if (ensure_buf(need)) {
-					continue;
-				}
+				ensure_buf(need);
 				memcpy(buf + buf_end_pos, pos, need);
 				buf_end_pos += need;
 				break;
 			}
 			pos = eol + 1;
 		}
-		while (109) {
-			size_t need = snprintf(buf + buf_end_pos,
-					buf_capacity - buf_end_pos,
-					RESET FRMT_CURSOR_SET_COLUMN "\u2502",
-					(int) display_sizes.x);
-			if (ensure_buf(need)) {
-				continue;
+		if (decorations) {
+			while (109) {
+				size_t need = snprintf(buf + buf_end_pos,
+						buf_capacity - buf_end_pos,
+						RESET FRMT_CURSOR_SET_COLUMN "\u2502",
+						(int) display_sizes.x);
+				if (ensure_buf(need)) {
+					continue;
+				}
+				buf_end_pos += need;
+				break;
 			}
-			buf_end_pos += need;
-			break;
+		} else {
+			addstr(RESET "\n");
 		}
 	}
-	if (footer_display_lines != 2 /*TODO improve statement? */) {
-		addstr("\u251C");
+	if (footer_display_lines != decorations ?
+			2 : 0 /*TODO improve statement? */) {
+		if (decorations) {
+			addstr("\u251C");
+			for (size_t i = 1; i < display_sizes.x - 1; ++i) {
+				addstr("\u2500");
+			}
+			addstr("\u2524");
+		}
+		// TODO print footer
+	}
+	if (decorations) {
+		addstr("\u2514");
 		for (size_t i = 1; i < display_sizes.x - 1; ++i) {
 			addstr("\u2500");
 		}
-		addstr("\u2524");
-		// TODO print footer
+		addstr("\u2518");
 	}
-	addstr("\u2514");
-	for (size_t i = 1; i < display_sizes.x - 1; ++i) {
-		addstr("\u2500");
-	}
-	addstr("\u2518");
 	write_buf();
 }
 
@@ -368,7 +399,7 @@ static int nextc() {
 			return -1;
 		} else {
 			struct timespec wait = { .tv_nsec = 1000000 /* 1 ms */};
-			thrd_sleep(&wait, 0);
+			nanosleep(&wait, 0);
 		}
 	}
 }
@@ -452,20 +483,29 @@ static int refill_world() {
 		end = memchr(c, ETX_C, world_data + world_data_size - c);
 		if (!end)
 			end = memchr(c, EOT_C, world_data + world_data_size - c);
-		if (!end)
+		if (!end) {
 			end = world_data + world_data_size;
+			if (end[-1] == EM_C)
+				--end;
+			if (end[-1] == FF_C)
+				--end;
+		} else
+			--end;
 		while (422) {
 			char *eol = memchr(c, '\n', end - c);
-			char *lend = eol ? eol - 1 : end;
+			if (!eol)
+				eol = end;
 			size_t chars;
 			text_end(c, rbuf_end_pos, c - eol, &chars);
 			if (chars > max_pos.x) {
 				max_pos.x = chars;
 			}
-			if (!eol) {
+			if (c + 1 < end) {
+				max_pos.y++;
+			}
+			if (eol == end) {
 				break;
 			}
-			max_pos.y++;
 			c = eol + 1;
 		}
 	}
@@ -487,7 +527,12 @@ static int refill_world() {
 	return 0;
 }
 
-int start_solve(void *arg) {
+#if AOC_POSIX
+static void*
+#else
+static int
+#endif
+start_solve(void *arg) {
 	solve(arg);
 	fputs(STEP_ALL_FINISHED, solution_out);
 	fflush(solution_out);
@@ -497,18 +542,19 @@ int start_solve(void *arg) {
 
 void interact(char *path, int force_interactive) {
 	puzzle_file = path;
-#ifndef __unix__
+#ifndef AOC_POSIX
 	if (!force_interactive) {
 		return;
 	}
 	fprintf(stderr, "non POSIX systems are not completely supported\n");
 	in = stdin;
 	out = stderr;
-#else // __unix__
+#else // AOC_POSIX
 	fflush(stderr);
 	in = STDIN_FILENO;
-	char *tty = getenv("TERM");
+	char *tty = getenv("TERMINAL");
 	if (tty) {
+		printf("use env(TERMINAL): %s\n", tty);
 		in = open(tty, O_RDONLY);
 		if (in < 0) {
 			if (force_interactive) {
@@ -552,6 +598,7 @@ void interact(char *path, int force_interactive) {
 		perror("ttyname");
 		exit(EXIT_FAILURE);
 	}
+	printf("use %s\n", nam);
 	out = open(nam, O_WRONLY);
 	if (out < 0) {
 		fprintf(stderr, "failed to open(%s, WRONLY): %s\n", nam,
@@ -559,8 +606,8 @@ void interact(char *path, int force_interactive) {
 		tcsetattr(in, TCSAFLUSH, &orig_term);
 		exit(EXIT_FAILURE);
 	}
-#endif // __unix__
-	buf_capacity = 1024;
+#endif // AOC_POSIX
+	buf_capacity = 4096;
 	buf = malloc(buf_capacity);
 	if (!buf) {
 		perror("malloc");
@@ -576,7 +623,7 @@ void interact(char *path, int force_interactive) {
 		free(world_data);
 		free(buf);
 		free(rbuf);
-#ifdef __unix__
+#ifdef AOC_POSIX
 		tcsetattr(in, TCSAFLUSH, &orig_term);
 		if (in != STDIN_FILENO)
 #else
@@ -594,21 +641,23 @@ void interact(char *path, int force_interactive) {
 			puzzle_file);
 	init_acts();
 	solution_out = fopen(data_file, "wb");
-#ifdef __unix__
+#ifdef AOC_POSIX
 	data_in = open(data_file, O_RDONLY);
-#else // __unix__
+#else // AOC_POSIX
 	data_in = fopen(data_file, "rb");
-#endif // __unix__
-#ifdef __STDC_NO_THREADS__
+#endif // AOC_POSIX
+#if AOC_POSIX
+	pthread_create(&thrd, 0, start_solve, puzzle_file);
+#elif defined __STDC_NO_THREADS__
 	printf("no threads are supported, you have to wait a until I solved the puzzle\n");
 	solve(puzzle_file);
 #else // __STDC_NO_THREADS__
 	thrd_create(&thrd, start_solve, puzzle_file);
 	struct timespec wait = { .tv_nsec = 1000000 /* 10ms */};
-	thrd_sleep(&wait, 0); /* give the solver a little time */
+	nanosleep(&wait, 0); /* give the solver a little time */
 #endif // __STDC_NO_THREADS__
-	world_data = malloc(1024);
 	world_data_max_size = 1024;
+	world_data = malloc(world_data_max_size);
 	refill_world();
 	if (rbuf_pos != rbuf_end_pos) {
 		read_command();
@@ -638,7 +687,7 @@ void interact(char *path, int force_interactive) {
 				break;
 			} else {
 				struct timespec wait = { .tv_nsec = 5000000 /* 5 ms */};
-				thrd_sleep(&wait, 0);
+				nanosleep(&wait, 0);
 			}
 		}
 	}
@@ -666,7 +715,7 @@ static ssize_t timeout_read(time_t start, size_t add_off, int allow_fail) {
 			exit(EXIT_FAILURE);
 		} else {
 			struct timespec wait = { .tv_nsec = 1000000 /* 1 ms */};
-			thrd_sleep(&wait, 0);
+			nanosleep(&wait, 0);
 		}
 		continue;
 	}
@@ -885,11 +934,16 @@ static void act_next_world(unsigned flags) {
 		if (world_data_size && world_data[world_data_size - 1] == EM_C) {
 			break;
 		}
-		world_off += world_data_size;
+		if (world_data[world_data_size - 1] == FF_C) {
+			world_off += world_data_size;
+		}
 		if (refill_world()) {
 			world_off = last_off;
 			refill_world();
 			break;
+		}
+		if (world_off == last_off) {
+			world_idx--;
 		}
 	}
 }
@@ -902,19 +956,20 @@ static void act_prev_world(unsigned flags) {
 		count = 10;
 	else
 		count = 1;
-	if (!world_idx) {
-		return;
-	}
 	for (int i = 0; i < count; ++i, --world_idx) {
 		if (!world_idx) {
 			break;
 		}
 		off_t last_off = world_off;
-		lseek(data_in, world_off - world_data_max_size, SEEK_SET);
+		size_t read_len = world_data_max_size;
+		if (read_len > world_off) {
+			read_len = world_off;
+		}
+		lseek(data_in, world_off - read_len, SEEK_SET);
 		world_data_size = 0;
-		while (world_data_size < world_data_max_size) {
+		while (world_data_size < read_len) {
 			ssize_t r = read(data_in, world_data + world_data_size,
-					world_data_max_size - world_data_size);
+					read_len - world_data_size);
 			if (r <= 0) {
 				if (errno == EINTR) {
 					continue;
@@ -925,10 +980,14 @@ static void act_prev_world(unsigned flags) {
 			world_data_size += r;
 		}
 		char *c = memchr(world_data, FF_C, world_data_size - 1);
+		if (!c)
+			c = world_data;
+		else
+			c++;
 		while (919) {
-			char *next = memchr(c + 1, FF_C, world_data_size - 1);
+			char *next = memchr(c, FF_C, world_data + world_data_size - c - 1);
 			if (next) {
-				c = next;
+				c = next + 1;
 				continue;
 			}
 			break;
@@ -1083,7 +1142,7 @@ static void act_command(unsigned flags) {
 			errno = 0;
 		}
 		struct timespec wait = { .tv_nsec = 5000000 /* 5 ms */};
-		thrd_sleep(&wait, 0);
+		nanosleep(&wait, 0);
 	}
 }
 
