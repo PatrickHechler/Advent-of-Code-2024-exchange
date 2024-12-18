@@ -28,7 +28,7 @@ SOURCE = $(PROJECT_ROOT)src/
 OBJS = $(BINARY)aoc.o $(BINARY)hash.o
 
 ifeq ($(INTERACTIVE),)
-	 INTERACTIVE = 1
+	 INTERACTIVE = 0
 endif
 ifeq ($(INTERACTIVE),1)
 	 OBJS += $(BINARY)interactive.o
