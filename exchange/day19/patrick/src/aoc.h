@@ -68,9 +68,11 @@
 ssize_t getline(char **line_buf, size_t *line_len, FILE *file);
 #endif
 #if !(AOC_COMPAT & AC_STRCN)
-char* strchrnul(char *str, char c);
+char* strchrnul(char *str, int c);
 #endif
 #if !(AOC_COMPAT & AC_REARR)
+#include <stddef.h>
+
 void* reallocarray(void*ptr, size_t nmemb, size_t size);
 #endif
 

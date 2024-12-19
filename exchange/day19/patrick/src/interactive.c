@@ -32,9 +32,11 @@
 #endif
 
 #if AOC_COMPAT & AC_POSIX
-#include <termios.h>
-#include <unistd.h>
-#include <fcntl.h>
+#	if AOC_COMPAT & AC_TERMS
+#		include <termios.h>
+#	endif // AC_TERMS
+#	include <unistd.h>
+#	include <fcntl.h>
 static int in;
 static int out;
 static int data_in;
@@ -42,11 +44,11 @@ static int data_in;
 static FILE *in;
 static FILE *out;
 static FILE *data_in;
-#define read(in, buf, count) fread(in, 1, buf, count)
-#define write(out, buf, count) fwrite(out, buf, 1, count); fflush(out)
-#define dprintf(out, ...) fprintf(out, __VA_ARGS__); fflush(out)
-#define close(fd) fclose(fd)
-#define lseek(fd, off, whence) fsseko(fd, off, whence)
+#	define read(in, buf, count) fread(in, 1, buf, count)
+#	define write(out, buf, count) fwrite(out, buf, 1, count); fflush(out)
+#	define dprintf(out, ...) fprintf(out, __VA_ARGS__); fflush(out)
+#	define close(fd) fclose(fd)
+#	define lseek(fd, off, whence) fsseko(fd, off, whence)
 #endif // AC_POSIX
 #define writestr(out, str) write(out, str, sizeof(str) - 1)
 #define addstr(str) ensure_buf(sizeof(str) - 1); \
@@ -322,8 +324,8 @@ static void show() {
 			addstr(RESET "\n");
 		}
 	}
-	if (footer_display_lines != decorations ?
-			2 : 0 /*TODO improve statement? */) {
+	if (footer_display_lines != (decorations ?
+			2 : 0 /*TODO improve statement? */)) {
 		if (decorations) {
 			addstr("\u251C");
 			for (size_t i = 1; i < display_sizes.x - 1; ++i) {
@@ -433,6 +435,7 @@ static void read_command() {
 	}
 }
 
+#ifdef AOC_COMPAT & AC_TERMS
 static struct termios orig_term;
 static void restore_term() {
 	writestr(out, SHOW_CURSOR RESET "\ngoodbye\n");
@@ -440,6 +443,7 @@ static void restore_term() {
 	tcsetattr(in, TCSAFLUSH, &orig_term);
 	close(in);
 }
+#endif // AC_TERMS
 
 static inline void init_acts();
 static void act_next_world(unsigned);
@@ -624,7 +628,11 @@ void interact(char *path, int force_interactive) {
 		perror("malloc");
 		exit(EXIT_FAILURE);
 	}
-	if (update_display_size(!force_interactive) || atexit(restore_term)) {
+	if (update_display_size(!force_interactive)
+#ifdef AC_TERMS
+			|| atexit(restore_term)
+#endif
+			) {
 		free(world_data);
 		free(buf);
 		free(rbuf);
