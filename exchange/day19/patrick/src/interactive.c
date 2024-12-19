@@ -623,7 +623,7 @@ void interact(char *path, int force_interactive) {
 		exit(EXIT_FAILURE);
 	}
 	if (update_display_size(!force_interactive)
-#ifdef AC_POSIX
+#if AOC_COMPAT & AC_POSIX
 			|| atexit(restore_term)
 #endif
 			) {
