@@ -53,7 +53,7 @@ struct data {
 	size_t max_designs_size;
 };
 
-static int do_print = 0;
+static int do_print = 1;
 
 static void print(FILE *str, struct data *data, uint64_t result) {
 	num specialx = -1;
@@ -70,48 +70,244 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 	fputs(STEP_FINISHED, str);
 }
 
-static int is_possible(char *design, char **towels, size_t towels_size) {
-	if (do_print) {
-		fprintf(solution_out, "remain: %s\n", design);
+struct result {
+	char *value;
+	uint64_t result;
+};
+
+static uint64_t r_h(const void *a) {
+	_Static_assert(offsetof(struct result, value) == 0, "Error!");
+	uint64_t result = 1;
+	for (const char *c = ((const struct result*) a)->value; *c; ++c) {
+		result = result * 31 + *c;
 	}
+	return result;
+}
+
+static int r_e(const void *a, const void *b) {
+	return !strcmp(((const struct result*) a)->value,
+			((const struct result*) b)->value);
+}
+
+struct hs_list {
+	char *value;
+	uint64_t count;
+	struct hs_list *next;
+};
+
+static uint64_t t_h(const void *a) {
+	_Static_assert(offsetof(struct hs_list, value) == 0, "Error!");
+	return (((const struct hs_list*) a)->value[1] << 8)
+			| ((const struct hs_list*) a)->value[0];
+}
+
+static int t_e(const void *a, const void *b) {
+	const struct hs_list *al = (const struct hs_list*) a;
+	const struct hs_list *bl = (const struct hs_list*) b;
+	return al->value[0] == bl->value[0] && al->value[1] == bl->value[1];
+}
+
+static void* compute_hsl(void *param, void *old_element, void *new_element) {
+	char *val = ((struct hs_list*) new_element)->value;
+	for (struct hs_list *old = old_element; old; old = old->next) {
+		if (strcmp(old->value, val))
+			continue;
+		old->count++;
+		return old_element;
+	}
+	struct hs_list *result = malloc(sizeof(struct hs_list));
+	result->value = strdup(val);
+	result->count = 1;
+	result->next = old_element;
+	return result;
+}
+
+static int f_free_hsl(void *param, void *element) {
+	struct hs_list *list = element;
+	while (list) {
+		free(list->value);
+		struct hs_list *old = list;
+		list = list->next;
+		free(old);
+	}
+	return 0;
+}
+
+static int v_count_hsl(void *param, void *element) {
+	long result = 0;
+	for (struct hs_list *list = element; list; list = list->next)
+		++result;
+	*(long*) param += result;
+	return 0;
+}
+
+//static uint64_t is_possible(char *design, char **towels, size_t towels_size) {
+//	if (do_print) {
+//		fprintf(solution_out, "remain: %s\n", design);
+//	}
+//	size_t remain = strlen(design);
+//	uint64_t result = 0;
+//	for (int i = 0; i < towels_size; ++i) {
+//		char *t = towels[i];
+//		size_t tlen = strlen(t);
+//		if (tlen > remain || memcmp(design, t, tlen)) {
+//			continue;
+//		}
+//		if (tlen == remain) {
+//			if (do_print) {
+//				fprintf(solution_out, "finish towel:   %s\n", t);
+//			}
+//			if (part == 1) {
+//				return 1;
+//			}
+//			result++;
+//			continue;
+//		}
+//		if (do_print) {
+//			fprintf(solution_out, "try with towel: %s\n", t);
+//		}
+//		result += is_possible(design + tlen, towels, towels_size);
+//		if (part == 1 && result) {
+//			return 1;
+//		}
+//	}
+//	return result;
+//}
+
+static uint64_t is_possible(char *design, struct hashset *hs,
+		struct hashset *hs2, size_t hs2ml, struct hashset *hs_r);
+
+static struct result* calc_possible(char *design, struct hashset *hs,
+		struct hashset *hs2, size_t hs2ml, struct hashset *hs_r) {
 	size_t remain = strlen(design);
-	for (int i = 0; i < towels_size; ++i) {
-		char *t = towels[i];
+	uint64_t result = 0;
+	struct hashset *uhs = remain > hs2ml ? hs2 : hs;
+	for (struct hs_list *l = hs_get(uhs, &design); l; l = l->next) {
+		const char *t = l->value;
 		size_t tlen = strlen(t);
 		if (tlen > remain || memcmp(design, t, tlen)) {
 			continue;
 		}
 		if (tlen == remain) {
-			if (do_print) {
-				fprintf(solution_out, "finish towel:   %s\n", t);
+			if (part == 1) {
+				result = 1;
+				break;
 			}
-			return 88;
+			result += l->count;
+			continue;
 		}
-		if (do_print) {
-			fprintf(solution_out, "try with towel: %s\n", t);
+		uint64_t add = is_possible(design + tlen, hs, hs2, hs2ml, hs_r);
+		if (part == 1 && add) {
+			result = 1;
+			break;
 		}
-		if (is_possible(design + tlen, towels, towels_size)) {
-			return 94;
+		result += add * l->count;
+	}
+	if (remain > 1) {
+		char c = design[1];
+		design[1] = 0;
+		struct hs_list *l = hs_get(uhs, &design);
+		design[1] = c;
+		if (l) {
+			if (1 == remain) {
+				if (part == 1) {
+					result = 1;
+				} else {
+					result += l->count;
+				}
+			} else {
+				result += is_possible(design + 1, hs, hs2, hs2ml, hs_r)
+						* l->count;
+			}
 		}
 	}
-	return 0;
+	if (do_print && remain > 24) {
+		fprintf(solution_out, "found %9s possibilities for %60s\n",
+				u64toa(result), design);
+	}
+	struct result *res = malloc(sizeof(struct result));
+	res->value = design;
+	res->result = result;
+	return res;
+}
+
+static uint64_t is_possible(char *design, struct hashset *hs,
+		struct hashset *hs2, size_t hs2ml, struct hashset *hs_r) {
+	struct result *r = hs_get(hs_r, &design);
+	if (!r) {
+		r = calc_possible(design, hs, hs2, hs2ml, hs_r);
+		hs_set(hs_r, r);
+	}
+	return r->result;
 }
 
 const char* solve(const char *path) {
 	struct data *data = read_data(path);
 	uint64_t result = 0;
+	struct hashset hs = { .hash = t_h, .equal = t_e };
+	struct hashset hs2 = { .hash = t_h, .equal = t_e };
+	for (int i = 0; i < data->towels_size; ++i) {
+		hs_compute(&hs, &data->towels[i], 0, compute_hsl);
+	}
+	size_t hs2_ml = 0;
+	for (int i0 = 0; i0 < data->towels_size; ++i0) {
+		const char *t0 = data->towels[i0];
+		size_t len0 = strlen(t0);
+		long cnt = 0;
+		hs_for_each(&hs2, &cnt, v_count_hsl);
+		printf("%s remain [%ld : %ld/%ld : %ld]\n",
+				u64toa(
+						(data->towels_size - i0) * data->towels_size
+								* data->towels_size
+//								* data->towels_size
+								), (long) data->towels_size - i0,
+				(long) hs2.entry_count, (long) hs2.data_size, cnt);
+		for (int i1 = 0; i1 < data->towels_size; ++i1) {
+			const char *t1 = data->towels[i1];
+			size_t len1 = strlen(t1);
+//			for (int i2 = 0; i2 < data->towels_size; ++i2) {
+//				const char *t2 = data->towels[i2];
+//				size_t len2 = strlen(t2);
+				if (len0 + len1
+//						+ len2
+						> hs2_ml) {
+					hs2_ml = len0 + len1
+//							+ len2
+							;
+				}
+				char t[len0 + len1
+//					   	   + len2
+						+ 1];
+				memcpy(t, t0, len0);
+				memcpy(t + len0, t1, len1);
+//				memcpy(t + len0 + len1, t1, len2);
+				t[len0 + len1
+//					  + len2
+				] = 0;
+				char *b = t;
+				hs_compute(&hs2, &b, 0, compute_hsl);
+//			}
+		}
+	}
+	long cnt = 0;
+	hs_for_each(&hs2, &cnt, v_count_hsl);
+	printf("calculated set [%ld : %ld]\n", (long) hs2.entry_count, cnt);
+	struct hashset hs_r = { .hash = r_h, .equal = r_e, .free = free };
 	for (int i = 0; i < data->designs_size; ++i) {
 		fprintf(solution_out, STEP_HEADER "check design %s\n" STEP_BODY,
 				data->designs[i]);
-		if (is_possible(data->designs[i], data->towels,
-				data->towels_size))
-			result ++;
-			fprintf(solution_out, "the design is possibe\n",
-					u64toa(add));
+		uint64_t add = is_possible(data->designs[i], &hs, &hs2, hs2_ml, &hs_r);
+		if (add) {
+			result += add;
 		}
+		fprintf(solution_out, "the design has %s possibilities\n",
+				u64toa(add));
 		fprintf(solution_out, "new result: %s\n" STEP_FINISHED, u64toa(result));
 	}
 	print(solution_out, data, result);
+	hs_filter(&hs, 0, f_free_hsl);
+	hs_clear(&hs);
+	hs_clear(&hs2);
 	for (num i = 0; i < data->designs_size; ++i) {
 		free(data->designs[i]);
 	}
@@ -305,7 +501,7 @@ int main(int argc, char **argv) {
 #ifdef INTERACTIVE
 							" [interactive]"
 #endif
-					" [p1|p2] [DATA]\n", me);
+							" [p1|p2] [DATA]\n", me);
 			return 1;
 		}
 		int idx = 1;
@@ -319,7 +515,7 @@ int main(int argc, char **argv) {
 		}
 		if (idx < argc)
 #endif
-				{
+		{
 			if (!strcmp("p1", argv[idx])) {
 				part = 1;
 				idx++;
