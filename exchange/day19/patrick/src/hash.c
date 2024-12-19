@@ -20,13 +20,13 @@ struct hs_list {
 };
 
 union hs_entry {
-	ptrdiff_t number;
+	intptr_t number;
 	void *value;
 	struct hs_list *list;
 };
 
-#if PTRDIFF_MIN == 0
-#	error "ptrdiff_t is unsigned"
+#if INTPTR_MIN == 0
+#	error "intptr_t is unsigned"
 #endif
 
 void* hs_get(struct hashset *hs, void *val) {
@@ -52,9 +52,9 @@ void* hs_get(struct hashset *hs, void *val) {
 	return 0;
 }
 
-static void free_entries(ssize_t entry_count, union hs_entry *data,
+static void free_entries(intptr_t entry_count, union hs_entry *data,
 		void (*free_element)(void*)) {
-	ssize_t remain = entry_count;
+	intptr_t remain = entry_count;
 	for (size_t o = 0; entry_count < 0 ? o < -entry_count : remain; o++) {
 		union hs_entry e = data[o];
 		if (e.number > 0) {

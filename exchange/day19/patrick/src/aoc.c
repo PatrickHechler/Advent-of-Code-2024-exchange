@@ -36,9 +36,7 @@ int interactive = 0;
 #define starts_with(str, start) !memcmp(str, start, sizeof(start) - 1)
 
 typedef long num;
-#define NUMF "%ld"
-typedef double fpnum;
-#define FPNUMF "%g"
+#define NUMF "l"
 
 struct pos {
 	num x;
@@ -56,10 +54,8 @@ struct data {
 static int do_print = 1;
 
 static void print(FILE *str, struct data *data, uint64_t result) {
-	num specialx = -1;
-	num specialy = -1;
 	if (result) {
-		fprintf(str, "%sresult=%s\n%s", STEP_HEADER, u64toa(result), STEP_BODY);
+		fprintf(str, "%sresult=%"I64"u\n%s", STEP_HEADER, result, STEP_BODY);
 	} else {
 		fputs(STEP_BODY, str);
 	}
@@ -141,39 +137,6 @@ static int v_count_hsl(void *param, void *element) {
 	return 0;
 }
 
-//static uint64_t is_possible(char *design, char **towels, size_t towels_size) {
-//	if (do_print) {
-//		fprintf(solution_out, "remain: %s\n", design);
-//	}
-//	size_t remain = strlen(design);
-//	uint64_t result = 0;
-//	for (int i = 0; i < towels_size; ++i) {
-//		char *t = towels[i];
-//		size_t tlen = strlen(t);
-//		if (tlen > remain || memcmp(design, t, tlen)) {
-//			continue;
-//		}
-//		if (tlen == remain) {
-//			if (do_print) {
-//				fprintf(solution_out, "finish towel:   %s\n", t);
-//			}
-//			if (part == 1) {
-//				return 1;
-//			}
-//			result++;
-//			continue;
-//		}
-//		if (do_print) {
-//			fprintf(solution_out, "try with towel: %s\n", t);
-//		}
-//		result += is_possible(design + tlen, towels, towels_size);
-//		if (part == 1 && result) {
-//			return 1;
-//		}
-//	}
-//	return result;
-//}
-
 static uint64_t is_possible(char *design, struct hashset *hs,
 		struct hashset *hs2, size_t hs2ml, struct hashset *hs_r);
 
@@ -222,8 +185,8 @@ static struct result* calc_possible(char *design, struct hashset *hs,
 		}
 	}
 	if (do_print && remain > 24) {
-		fprintf(solution_out, "found %9s possibilities for %60s\n",
-				u64toa(result), design);
+		fprintf(solution_out, "found %15"I64"u possibilities for %60s\n", result,
+				design);
 	}
 	struct result *res = malloc(sizeof(struct result));
 	res->value = design;
@@ -250,18 +213,16 @@ const char* solve(const char *path) {
 		hs_compute(&hs, &data->towels[i], 0, compute_hsl);
 	}
 	size_t hs2_ml = 0;
-	for (int i0 = 0; i0 < data->towels_size; ++i0) {
+	for (size_t i0 = 0; i0 < data->towels_size; ++i0) {
 		const char *t0 = data->towels[i0];
 		size_t len0 = strlen(t0);
 		long cnt = 0;
 		hs_for_each(&hs2, &cnt, v_count_hsl);
-		printf("%s remain [%ld : %ld/%ld : %ld]\n",
-				u64toa(
-						(data->towels_size - i0) * data->towels_size
-								* data->towels_size
+		printf("%zu remain [%zu : %zu/%zu : %zu]\n",
+				(data->towels_size - i0) * data->towels_size * data->towels_size
 //								* data->towels_size
-								), (long) data->towels_size - i0,
-				(long) hs2.entry_count, (long) hs2.data_size, cnt);
+						, data->towels_size - i0, hs2.entry_count,
+				hs2.data_size, cnt);
 		for (int i1 = 0; i1 < data->towels_size; ++i1) {
 			const char *t1 = data->towels[i1];
 			size_t len1 = strlen(t1);
@@ -289,9 +250,9 @@ const char* solve(const char *path) {
 //			}
 		}
 	}
-	long cnt = 0;
+	uint64_t cnt = 0;
 	hs_for_each(&hs2, &cnt, v_count_hsl);
-	printf("calculated set [%ld : %ld]\n", (long) hs2.entry_count, cnt);
+	printf("calculated set [%zu : %"I64"u]\n", hs2.entry_count, cnt);
 	struct hashset hs_r = { .hash = r_h, .equal = r_e, .free = free };
 	for (int i = 0; i < data->designs_size; ++i) {
 		fprintf(solution_out, "%scheck design %s\n%s",
@@ -300,8 +261,8 @@ const char* solve(const char *path) {
 		if (add) {
 			result += add;
 		}
-		fprintf(solution_out, "the design has %s possibilities\n", u64toa(add));
-		fprintf(solution_out, "new result: %s\n%s", u64toa(result),
+		fprintf(solution_out, "the design has %"I64"u possibilities\n", add);
+		fprintf(solution_out, "new result: %"I64"u\n%s", result,
 		/*		*/STEP_FINISHED);
 	}
 	print(solution_out, data, result);
@@ -376,7 +337,7 @@ static struct data* parse_line(struct data *data, char *line) {
 
 // common stuff
 
-#ifndef AOC_POSIX
+#if !(AOC_COMPAT & AC_POSIX)
 ssize_t getline(char **line_buf, size_t *line_len, FILE *file) {
 	ssize_t result = 0;
 	while (21) {
@@ -426,10 +387,14 @@ ssize_t getline(char **line_buf, size_t *line_len, FILE *file) {
 		result += len;
 	}
 }
-char* strchrnul(char *str, char c) {
+#endif // AC_POSIX
+#if !(AOC_COMPAT & AC_STRCN)
+char* strchrnul(char *str, int c) {
 	char *end = strchr(str, c);
 	return end ? end : (str + strlen(str));
 }
+#endif // AC_STRCN
+#if !(AOC_COMPAT & AC_REARR)
 void* reallocarray(void *ptr, size_t nmemb, size_t size) {
 	size_t s = nmemb * size;
 	if (s / size != nmemb) {
@@ -438,19 +403,19 @@ void* reallocarray(void *ptr, size_t nmemb, size_t size) {
 	}
 	return realloc(ptr, s);
 }
-#endif
+#endif // AC_REARR
 
 char* u64toa(uint64_t value) {
-	static char result[23];
-	if (sprintf(result, "%llu", (unsigned long long) value) <= 0) {
+	static char result[21];
+	if (sprintf(result, "%"I64"u", value) <= 0) {
 		return 0;
 	}
 	return result;
 }
 
 char* d64toa(int64_t value) {
-	static char result[23];
-	if (sprintf(result, "%lld", (unsigned long long) value) <= 0) {
+	static char result[21];
+	if (sprintf(result, "%"I64"d", value) <= 0) {
 		return 0;
 	}
 	return result;
@@ -555,8 +520,9 @@ int main(int argc, char **argv) {
 	if (result) {
 		uint64_t diff = end - start;
 		printf("the result is %s\n"
-				"  I needed %lu.%.6lu seconds\n", result, diff / CLOCKS_PER_SEC,
-				((diff % CLOCKS_PER_SEC) * 1000000LU) / CLOCKS_PER_SEC);
+				"  I needed %"I64"u.%.6"I64"u seconds\n", result,
+				diff / CLOCKS_PER_SEC,
+				((diff % CLOCKS_PER_SEC) * UINT64_C(1000000)) / CLOCKS_PER_SEC);
 	} else {
 		puts("there is no result");
 	}

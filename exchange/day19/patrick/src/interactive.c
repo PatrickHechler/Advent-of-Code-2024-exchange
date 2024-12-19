@@ -18,7 +18,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#if AOC_POSIX
+#if AOC_COMPAT & AC_POSIX
 #include <pthread.h>
 #elif defined __STDC_NO_THREADS__
 #include <threads.h>
@@ -31,14 +31,14 @@
 #define nanosleep(wait, remain) ((void)0)
 #endif
 
-#ifdef AOC_POSIX
+#if AOC_COMPAT & AC_POSIX
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
 static int in;
 static int out;
 static int data_in;
-#else // AOC_POSIX
+#else // AC_POSIX
 static FILE *in;
 static FILE *out;
 static FILE *data_in;
@@ -47,13 +47,13 @@ static FILE *data_in;
 #define dprintf(out, ...) fprintf(out, __VA_ARGS__); fflush(out)
 #define close(fd) fclose(fd)
 #define lseek(fd, off, whence) fsseko(fd, off, whence)
-#endif // AOC_POSIX
+#endif // AC_POSIX
 #define writestr(out, str) write(out, str, sizeof(str) - 1)
 #define addstr(str) ensure_buf(sizeof(str) - 1); \
 	memcpy(buf + buf_end_pos, str, sizeof(str) - 1); \
 	buf_end_pos += sizeof(str) - 1
 
-typedef long pos;
+typedef int64_t pos;
 struct pos2d {
 	pos x;
 	pos y;
@@ -61,7 +61,7 @@ struct pos2d {
 typedef struct pos2d pos2;
 
 static pos2 cur = { 0, 0 };
-#if AOC_POSIX
+#if AOC_COMPAT & AC_POSIX
 pthread_t thrd;
 #elif !defined  __STDC_NO_THREADS__
 thrd_t thrd;
@@ -527,7 +527,7 @@ static int refill_world() {
 	return 0;
 }
 
-#if AOC_POSIX
+#if AOC_COMPAT & AC_POSIX
 static void*
 #else
 static int
@@ -542,14 +542,14 @@ start_solve(void *arg) {
 
 void interact(char *path, int force_interactive) {
 	puzzle_file = path;
-#ifndef AOC_POSIX
+#if !(AOC_COMPAT & AC_POSIX)
 	if (!force_interactive) {
 		return;
 	}
 	fprintf(stderr, "non POSIX systems are not completely supported\n");
 	in = stdin;
 	out = stderr;
-#else // AOC_POSIX
+#else // AC_POSIX
 	fflush(stderr);
 	in = STDIN_FILENO;
 	char *tty = getenv("TERMINAL");
@@ -606,7 +606,7 @@ void interact(char *path, int force_interactive) {
 		tcsetattr(in, TCSAFLUSH, &orig_term);
 		exit(EXIT_FAILURE);
 	}
-#endif // AOC_POSIX
+#endif // AC_POSIX
 	buf_capacity = 4096;
 	buf = malloc(buf_capacity);
 	if (!buf) {
@@ -623,7 +623,7 @@ void interact(char *path, int force_interactive) {
 		free(world_data);
 		free(buf);
 		free(rbuf);
-#ifdef AOC_POSIX
+#if AOC_COMPAT & AC_POSIX
 		tcsetattr(in, TCSAFLUSH, &orig_term);
 		if (in != STDIN_FILENO)
 #else
@@ -641,12 +641,12 @@ void interact(char *path, int force_interactive) {
 			puzzle_file);
 	init_acts();
 	solution_out = fopen(data_file, "wb");
-#ifdef AOC_POSIX
+#if AOC_COMPAT & AC_POSIX
 	data_in = open(data_file, O_RDONLY);
-#else // AOC_POSIX
+#else // AC_POSIX
 	data_in = fopen(data_file, "rb");
-#endif // AOC_POSIX
-#if AOC_POSIX
+#endif // AC_POSIX
+#if AOC_COMPAT & AC_POSIX
 	pthread_create(&thrd, 0, start_solve, puzzle_file);
 #elif defined __STDC_NO_THREADS__
 	printf("no threads are supported, you have to wait a until I solved the puzzle\n");
