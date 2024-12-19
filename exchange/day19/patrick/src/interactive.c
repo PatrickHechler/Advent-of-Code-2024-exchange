@@ -48,7 +48,7 @@ static FILE *data_in;
 #	define write(out, buf, count) fwrite(buf, count, 1, out); fflush(out)
 #	define dprintf(out, ...) fprintf(out, __VA_ARGS__); fflush(out)
 #	define close(fd) fclose(fd)
-#	define lseek(fd, off, whence) fsseko(fd, off, whence)
+#	define lseek(fd, off, whence) fseek(fd, off, whence)
 #endif // AC_POSIX
 #define writestr(out, str) write(out, str, sizeof(str) - 1)
 #define addstr(str) ensure_buf(sizeof(str) - 1); \
