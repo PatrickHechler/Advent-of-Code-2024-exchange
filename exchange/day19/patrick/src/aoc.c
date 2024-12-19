@@ -59,7 +59,7 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 	num specialx = -1;
 	num specialy = -1;
 	if (result) {
-		fprintf(str, STEP_HEADER "result=%s\n" STEP_BODY, u64toa(result));
+		fprintf(str, "%sresult=%s\n%s", STEP_HEADER, u64toa(result), STEP_BODY);
 	} else {
 		fputs(STEP_BODY, str);
 	}
@@ -268,24 +268,24 @@ const char* solve(const char *path) {
 //			for (int i2 = 0; i2 < data->towels_size; ++i2) {
 //				const char *t2 = data->towels[i2];
 //				size_t len2 = strlen(t2);
-				if (len0 + len1
+			if (len0 + len1
 //						+ len2
-						> hs2_ml) {
-					hs2_ml = len0 + len1
+					> hs2_ml) {
+				hs2_ml = len0 + len1
 //							+ len2
-							;
-				}
-				char t[len0 + len1
+						;
+			}
+			char t[len0 + len1
 //					   	   + len2
-						+ 1];
-				memcpy(t, t0, len0);
-				memcpy(t + len0, t1, len1);
+					+ 1];
+			memcpy(t, t0, len0);
+			memcpy(t + len0, t1, len1);
 //				memcpy(t + len0 + len1, t1, len2);
-				t[len0 + len1
+			t[len0 + len1
 //					  + len2
-				] = 0;
-				char *b = t;
-				hs_compute(&hs2, &b, 0, compute_hsl);
+			] = 0;
+			char *b = t;
+			hs_compute(&hs2, &b, 0, compute_hsl);
 //			}
 		}
 	}
@@ -294,15 +294,15 @@ const char* solve(const char *path) {
 	printf("calculated set [%ld : %ld]\n", (long) hs2.entry_count, cnt);
 	struct hashset hs_r = { .hash = r_h, .equal = r_e, .free = free };
 	for (int i = 0; i < data->designs_size; ++i) {
-		fprintf(solution_out, STEP_HEADER "check design %s\n" STEP_BODY,
-				data->designs[i]);
+		fprintf(solution_out, "%scheck design %s\n%s",
+		/*		*/STEP_HEADER, data->designs[i], STEP_BODY);
 		uint64_t add = is_possible(data->designs[i], &hs, &hs2, hs2_ml, &hs_r);
 		if (add) {
 			result += add;
 		}
-		fprintf(solution_out, "the design has %s possibilities\n",
-				u64toa(add));
-		fprintf(solution_out, "new result: %s\n" STEP_FINISHED, u64toa(result));
+		fprintf(solution_out, "the design has %s possibilities\n", u64toa(add));
+		fprintf(solution_out, "new result: %s\n%s", u64toa(result),
+		/*		*/STEP_FINISHED);
 	}
 	print(solution_out, data, result);
 	hs_filter(&hs, 0, f_free_hsl);
@@ -501,7 +501,7 @@ int main(int argc, char **argv) {
 #ifdef INTERACTIVE
 							" [interactive]"
 #endif
-							" [p1|p2] [DATA]\n", me);
+					" [p1|p2] [DATA]\n", me);
 			return 1;
 		}
 		int idx = 1;
@@ -515,7 +515,7 @@ int main(int argc, char **argv) {
 		}
 		if (idx < argc)
 #endif
-		{
+				{
 			if (!strcmp("p1", argv[idx])) {
 				part = 1;
 				idx++;
