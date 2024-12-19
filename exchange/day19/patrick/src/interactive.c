@@ -18,23 +18,23 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#if AOC_COMPAT & AC_PTHRD
+#if AOC_COMPAT & AC_POSIX
 #include <pthread.h>
-#elif defined __STDC_NO_THREADS__
+#elif !defined __STDC_NO_THREADS__
 #include <threads.h>
-#define nanosleep(wait, remain) nanosleep(wait, remain)
+#define nanosleep(wait, remain) thrd_sleep(wait, remain)
 #else
 /* this is OK for here, there no need to repeatedly ask for the time.
  * this function is only used to wait a little before retrying the operation.
  * it may hurt the CPU usage, but it will be a busy sleep anyway, so might as
  * well check if the operation is now available. */
-#define nanosleep(wait, remain) ((void)0)
+#define nanosleep(wait, remain) ((void)(wait)->tv_nsec)
 #endif
 
 #if AOC_COMPAT & AC_POSIX
-#	if AOC_COMPAT & AC_TERMS
+#	if AOC_COMPAT & AC_POSIX
 #		include <termios.h>
-#	endif // AC_TERMS
+#	endif // AC_POSIX
 #	include <unistd.h>
 #	include <fcntl.h>
 static int in;
@@ -44,8 +44,8 @@ static int data_in;
 static FILE *in;
 static FILE *out;
 static FILE *data_in;
-#	define read(in, buf, count) fread(in, 1, buf, count)
-#	define write(out, buf, count) fwrite(out, buf, 1, count); fflush(out)
+#	define read(in, buf, count) fread(buf, count, 1, in)
+#	define write(out, buf, count) fwrite(buf, count, 1, out); fflush(out)
 #	define dprintf(out, ...) fprintf(out, __VA_ARGS__); fflush(out)
 #	define close(fd) fclose(fd)
 #	define lseek(fd, off, whence) fsseko(fd, off, whence)
@@ -63,7 +63,7 @@ struct pos2d {
 typedef struct pos2d pos2;
 
 static pos2 cur = { 0, 0 };
-#if AOC_COMPAT & AC_PTHRD
+#if AOC_COMPAT & AC_POSIX
 pthread_t thrd;
 #elif !defined  __STDC_NO_THREADS__
 thrd_t thrd;
@@ -434,7 +434,7 @@ static void read_command() {
 	}
 }
 
-#if AOC_COMPAT & AC_TERMS
+#if AOC_COMPAT & AC_POSIX
 static struct termios orig_term;
 static void restore_term() {
 	writestr(out, SHOW_CURSOR RESET "\ngoodbye\n");
@@ -442,7 +442,7 @@ static void restore_term() {
 	tcsetattr(in, TCSAFLUSH, &orig_term);
 	close(in);
 }
-#endif // AC_TERMS
+#endif // AC_POSIX
 
 static inline void init_acts();
 static void act_next_world(unsigned);
@@ -530,7 +530,7 @@ static int refill_world() {
 	return 0;
 }
 
-#if AOC_COMPAT & AC_PTHRD
+#if AOC_COMPAT & AC_POSIX
 static void*
 #else
 static int
@@ -545,19 +545,14 @@ start_solve(void *arg) {
 
 void interact(char *path, int force_interactive) {
 	puzzle_file = path;
-#if !(AOC_COMPAT & AC_TERMS)
+#if !(AOC_COMPAT & AC_POSIX)
 	if (!force_interactive) {
 		return;
 	}
 	fprintf(stderr, "non POSIX systems are not completely supported\n");
-#	ifdef AC_POSIX
-	in = STDIN_FILENO;
-	out = STDERR_FILENO;
-#	else // AC_POSIX
 	in = stdin;
 	out = stderr;
-#	endif // AC_POSIX
-#else // AC_TERMS
+#else // AC_POSIX
 	fflush(stderr);
 	in = STDIN_FILENO;
 	char *tty = getenv("TERMINAL");
@@ -614,7 +609,7 @@ void interact(char *path, int force_interactive) {
 		tcsetattr(in, TCSAFLUSH, &orig_term);
 		exit(EXIT_FAILURE);
 	}
-#endif // AC_TERMS
+#endif // AC_POSIX
 	buf_capacity = 4096;
 	buf = malloc(buf_capacity);
 	if (!buf) {
@@ -628,7 +623,7 @@ void interact(char *path, int force_interactive) {
 		exit(EXIT_FAILURE);
 	}
 	if (update_display_size(!force_interactive)
-#ifdef AC_TERMS
+#ifdef AC_POSIX
 			|| atexit(restore_term)
 #endif
 			) {
@@ -636,9 +631,7 @@ void interact(char *path, int force_interactive) {
 		free(buf);
 		free(rbuf);
 #if AOC_COMPAT & AC_POSIX
-#	if AOC_COMPAT & AC_TERMS
 		tcsetattr(in, TCSAFLUSH, &orig_term);
-#	endif
 		if (in != STDIN_FILENO)
 #else
 		if (in != stdin)
@@ -660,7 +653,7 @@ void interact(char *path, int force_interactive) {
 #else // AC_POSIX
 	data_in = fopen(data_file, "rb");
 #endif // AC_POSIX
-#if AOC_COMPAT & AC_PTHRD
+#if AOC_COMPAT & AC_POSIX
 	pthread_create(&thrd, 0, start_solve, puzzle_file);
 #elif defined __STDC_NO_THREADS__
 	printf("no threads are supported, you have to wait a until I solved the puzzle\n");
