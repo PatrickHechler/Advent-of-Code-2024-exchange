@@ -18,7 +18,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#if AOC_COMPAT & AC_POSIX
+#if AOC_COMPAT & AC_PTHRD
 #include <pthread.h>
 #elif defined __STDC_NO_THREADS__
 #include <threads.h>
@@ -61,7 +61,7 @@ struct pos2d {
 typedef struct pos2d pos2;
 
 static pos2 cur = { 0, 0 };
-#if AOC_COMPAT & AC_POSIX
+#if AOC_COMPAT & AC_PTHRD
 pthread_t thrd;
 #elif !defined  __STDC_NO_THREADS__
 thrd_t thrd;
@@ -527,7 +527,7 @@ static int refill_world() {
 	return 0;
 }
 
-#if AOC_COMPAT & AC_POSIX
+#if AOC_COMPAT & AC_PTHRD
 static void*
 #else
 static int
@@ -646,7 +646,7 @@ void interact(char *path, int force_interactive) {
 #else // AC_POSIX
 	data_in = fopen(data_file, "rb");
 #endif // AC_POSIX
-#if AOC_COMPAT & AC_POSIX
+#if AOC_COMPAT & AC_PTHRD
 	pthread_create(&thrd, 0, start_solve, puzzle_file);
 #elif defined __STDC_NO_THREADS__
 	printf("no threads are supported, you have to wait a until I solved the puzzle\n");
