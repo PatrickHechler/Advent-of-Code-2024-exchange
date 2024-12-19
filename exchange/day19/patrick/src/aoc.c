@@ -398,7 +398,7 @@ char* strchrnul(char *str, int c) {
 void* reallocarray(void *ptr, size_t nmemb, size_t size) {
 	size_t s = nmemb * size;
 	if (s / size != nmemb) {
-		errno = EOVERFLOW;
+		errno = ENOMEM;
 		return 0;
 	}
 	return realloc(ptr, s);

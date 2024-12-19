@@ -12,18 +12,19 @@
 #define AC_REARR 2
 #define AC_STRCN 4
 #define AC_PTHRD 8
+#define AC_TERMS 16
 /* only set AOC_COMPAT if not set by the CFLAGS */
 #ifndef AOC_COMPAT
 #	if defined __FreeBSD__ || (defined __gnu_linux__ || defined __GNU__ || defined __GLIBC__)
-#		define AOC_COMPAT (AC_POSIX | AC_REARR | AC_STRCN | AC_PTHRD)
+#		define AOC_COMPAT (AC_POSIX | AC_REARR | AC_STRCN | AC_PTHRD | AC_TERMS)
 #	elif defined __OpenBSD__
-#		define AOC_COMPAT (AC_POSIX | AC_REARR | AC_PTHRD)
+#		define AOC_COMPAT (AC_POSIX | AC_REARR | AC_PTHRD | AC_TERMS)
 #	elif defined __NetBSD__
-#		define AOC_COMPAT (AC_POSIX | AC_STRCN | AC_PTHRD)
+#		define AOC_COMPAT (AC_POSIX | AC_STRCN | AC_PTHRD | AC_TERMS)
 #	elif defined __unix__ \
 		|| (defined __bsdi__ || defined __DragonFly__) \
 		|| (defined __APPLE__ && defined __MACH__)
-#		define AOC_COMPAT (AC_POSIX | AC_PTHRD)
+#		define AOC_COMPAT (AC_POSIX | AC_PTHRD | AC_TERMS)
 #	elif defined __CYGWIN__ || defined __MINGW32__
 #		define AOC_COMPAT (AC_POSIX)
 #	else
@@ -48,11 +49,25 @@
 #	error "i don't know what the I64 type looks like! 37"
 #endif
 
+#define Z "z"
+#ifdef _WIN32
+#	undef I64
+#	undef Z
+#	define I64 "I64"
+#	ifdef _WIN64
+#		define Z I64
+#	else
+#		define Z "l"
+#	endif
+#endif // _WIN32
+
 #if !(AOC_COMPAT & AC_POSIX)
 #include <stdio.h>
 #include <stddef.h>
 
 ssize_t getline(char **line_buf, size_t *line_len, FILE *file);
+#endif
+#if !(AOC_COMPAT & AC_STRCN)
 char* strchrnul(char *str, char c);
 #endif
 #if !(AOC_COMPAT & AC_REARR)

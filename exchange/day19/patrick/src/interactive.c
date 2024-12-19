@@ -542,14 +542,19 @@ start_solve(void *arg) {
 
 void interact(char *path, int force_interactive) {
 	puzzle_file = path;
-#if !(AOC_COMPAT & AC_POSIX)
+#if !(AOC_COMPAT & AC_TERMS)
 	if (!force_interactive) {
 		return;
 	}
 	fprintf(stderr, "non POSIX systems are not completely supported\n");
+#	ifdef AC_POSIX
+	in = STDIN_FILENO;
+	out = STDERR_FILENO;
+#	else // AC_POSIX
 	in = stdin;
 	out = stderr;
-#else // AC_POSIX
+#	endif // AC_POSIX
+#else // AC_TERMS
 	fflush(stderr);
 	in = STDIN_FILENO;
 	char *tty = getenv("TERMINAL");
@@ -606,7 +611,7 @@ void interact(char *path, int force_interactive) {
 		tcsetattr(in, TCSAFLUSH, &orig_term);
 		exit(EXIT_FAILURE);
 	}
-#endif // AC_POSIX
+#endif // AC_TERMS
 	buf_capacity = 4096;
 	buf = malloc(buf_capacity);
 	if (!buf) {
@@ -624,7 +629,9 @@ void interact(char *path, int force_interactive) {
 		free(buf);
 		free(rbuf);
 #if AOC_COMPAT & AC_POSIX
+#	if AOC_COMPAT & AC_TERMS
 		tcsetattr(in, TCSAFLUSH, &orig_term);
+#	endif
 		if (in != STDIN_FILENO)
 #else
 		if (in != stdin)
