@@ -8,8 +8,6 @@
 #include "aoc.h"
 #include "hash.h"
 
-#include "term.h"
-
 #include <ctype.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -20,13 +18,19 @@
 #include <search.h>
 #include <string.h>
 
+#ifdef INTERACTIVE
+#define INTERACT(...) __VA_ARGS__
+#else
+#define INTERACT(...)
+#endif
+
 struct data* read_data(const char *path);
 
 int day = 17;
 int part = 2;
 FILE *solution_out;
 #ifdef INTERACTIVE
-static int interactive = 0;
+int interactive = 0;
 #endif
 
 #define starts_with(str, start) !memcmp(str, start, sizeof(start) - 1)
@@ -82,7 +86,7 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 	/*		   */"Register B: "NUMF"\n"
 	/*		   */"Register C: "NUMF"\n"
 	/*	 	   */"Instr Pntr: "NUMF"\n"
-	/*		  */"Program:\n", data->regs[0], data->regs[1], data->regs[2],
+	/*		   */"Program:\n", data->regs[0], data->regs[1], data->regs[2],
 			data->ip);
 	print_opcodes = 1;
 	for (char *i = data->instructions, *end = i + data->inst_size; i < end;
@@ -265,22 +269,45 @@ static int find(num a, num index) {
 	return (b ^ 3 ^ c) & 7;
 }
 
-static num build(num a, int index, const char *value) {
+static num build(num a, int index, const char *value INTERACT(, int length)) {
 	int shift = index * 3;
 	if (a & ((UINT64_C(1) << (index + 3)) - 1)) {
 		puts("ERROR 272");
 		exit(2);
 	}
-	a >>= shift;
+#ifdef INTERACTIVE
+	if (interactive) {
+		char cs[index];
+		memset(cs, '.', index);
+		a >>= shift;
+		fprintf(solution_out, STEP_BODY "current:   %.*s?%0.*lo\n", index, cs,
+				length - index - 1, a >> 3);
+		for (int i = 0; i <= 7; ++i) {
+			if (find(a | i, 0) == *value) {
+				fprintf(solution_out, FC_GRAY "candidate: %.*s%0.*lo\n", index,
+						cs, length - index, (a | i));
+			}
+		}
+		fputs(STEP_FINISHED, solution_out);
+	} else {
+#endif
+		a >>= shift;
+#ifdef INTERACTIVE
+	}
+#endif
 	for (int i = 0; i <= 7; ++i) {
 		if (find(a | i, 0) == *value) {
 			if (index) {
 				num na = (a | i) << shift;
-				num result = build(na, index - 1, value - 1);
+				num result = build(na, index - 1, value - 1 //
+				/*			*/INTERACT(, length));
 				if (result) {
 					return result;
 				}
 			} else {
+				fprintf(solution_out, STEP_BODY FC_GREEN "solution:  %0.*lo\n",
+						length, a | i);
+				fputs(STEP_FINISHED, solution_out);
 				return a | i;
 			}
 		}
@@ -304,7 +331,7 @@ const char* solvep1(struct data *data) {
 		olen = data->out_size;
 	} else
 #endif
-	olen = outlen(data->regs[0]);
+		olen = outlen(data->regs[0]);
 	static char *res = 0;
 	if (!res) {
 		res = malloc(olen + 1);
@@ -316,9 +343,9 @@ const char* solvep1(struct data *data) {
 		memcpy(res, data->out, olen);
 	} else
 #endif
-	for (int i = 0; i < olen; ++i) {
-		res[i] = find(data->regs[0], i);
-	}
+		for (int i = 0; i < olen; ++i) {
+			res[i] = find(data->regs[0], i);
+		}
 	res[data->out_size] = 0;
 	return res;
 }
@@ -327,7 +354,8 @@ const char* solvep2(struct data *data) {
 	num result = 0;
 	size_t start_index = data->inst_size - 1;
 	const char *start_ptr = data->instructions + start_index;
-	result = build(result, start_index, start_ptr);
+	result = build(result, start_index, start_ptr
+	/*			*/INTERACT(, data->inst_size));
 	return u64toa(result);
 }
 
@@ -540,7 +568,7 @@ int main(int argc, char **argv) {
 #ifdef INTERACTIVE
 							" [interactive]"
 #endif
-							" [p1|p2] [DATA]\n", me);
+					" [p1|p2] [DATA]\n", me);
 			return 1;
 		}
 		int idx = 1;
@@ -554,7 +582,7 @@ int main(int argc, char **argv) {
 		}
 		if (idx < argc)
 #endif
-		{
+				{
 			if (!strcmp("p1", argv[idx])) {
 				part = 1;
 				idx++;
@@ -584,9 +612,8 @@ int main(int argc, char **argv) {
 	if (interactive) {
 		printf("execute now day %d part %d on file %s in interactive mode\n",
 				day, part, f);
-		interact(f);
-		return EXIT_SUCCESS;
 	}
+	interact(f, interactive);
 #endif
 	printf("execute now day %d part %d on file %s\n", day, part, f);
 	clock_t start = clock();

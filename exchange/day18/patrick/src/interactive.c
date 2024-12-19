@@ -40,7 +40,7 @@ static FILE *in;
 static FILE *out;
 static FILE *data_in;
 #define read(in, buf, count) fread(in, 1, buf, count)
-#define write(out, buf, count) fwrite(out, 1, buf, count); fflush(out)
+#define write(out, buf, count) fwrite(out, buf, 1, count); fflush(out)
 #define dprintf(out, ...) fprintf(out, __VA_ARGS__); fflush(out)
 #define close(fd) fclose(fd)
 #define lseek(fd, off, whence) fsseko(fd, off, whence)
@@ -904,6 +904,38 @@ static void act_prev_world(unsigned flags) {
 		count = 1;
 	if (!world_idx) {
 		return;
+	}
+	for (int i = 0; i < count; ++i, --world_idx) {
+		if (!world_idx) {
+			break;
+		}
+		off_t last_off = world_off;
+		lseek(data_in, world_off - world_data_max_size, SEEK_SET);
+		world_data_size = 0;
+		while (world_data_size < world_data_max_size) {
+			ssize_t r = read(data_in, world_data + world_data_size,
+					world_data_max_size - world_data_size);
+			if (r <= 0) {
+				if (errno == EINTR) {
+					continue;
+				}
+				fprintf(stderr, "failed to reread data!\n");
+				exit(2);
+			}
+			world_data_size += r;
+		}
+		char *c = memchr(world_data, FF_C, world_data_size - 1);
+		while (919) {
+			char *next = memchr(c + 1, FF_C, world_data_size - 1);
+			if (next) {
+				c = next;
+				continue;
+			}
+			break;
+		}
+		world_data_size = world_data + world_data_size - c;
+		world_off = last_off - world_data_size;
+		memmove(world_data, c, world_data_size);
 	}
 }
 
