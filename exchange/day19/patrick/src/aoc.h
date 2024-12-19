@@ -8,14 +8,12 @@
 #ifndef SRC_AOC_H_
 #define SRC_AOC_H_
 
-#include <features.h>
-
 #define AC_POSIX 1
 #define AC_REARR 2
 #define AC_STRCN 4
 /* only set AOC_COMPAT if not set by the CFLAGS */
 #ifndef AOC_COMPAT
-#	if defined __GLIBC__ || defined __FreeBSD__
+#	if defined __FreeBSD__ || (defined __gnu_linux__ || defined __GNU__ || defined __GLIBC__)
 #		define AOC_COMPAT (AC_POSIX | AC_REARR | AC_STRCN)
 #	elif defined defined __OpenBSD__
 #		define AOC_COMPAT (AC_POSIX | AC_REARR)
