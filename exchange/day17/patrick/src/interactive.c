@@ -515,6 +515,7 @@ void interact(char *path, int force_interactive) {
 				fprintf(stderr, "open(%s, RDONLY) %s", tty, strerror(errno));
 				exit(EXIT_FAILURE);
 			}
+			errno = 0;
 			return;
 		}
 	}
@@ -524,6 +525,7 @@ void interact(char *path, int force_interactive) {
 			perror("tcgatattr(stdin)");
 			exit(EXIT_FAILURE);
 		}
+		errno = 0;
 		return;
 	}
 	orig_term = term;
@@ -584,6 +586,7 @@ void interact(char *path, int force_interactive) {
 #endif
 			close(in);
 		close(out);
+		errno = 0;
 		return;
 	}
 	interactive = 1;
