@@ -34,6 +34,12 @@
 
 #include <stdint.h>
 #include <limits.h>
+#include <errno.h>
+#include <stdio.h>
+
+#ifndef EWOULDBLOCK
+#	define EWOULDBLOCK EAGAIN
+#endif
 
 #if UINT64_MAX == UCHAR_MAX
 #	define I64 "hh"
@@ -51,6 +57,9 @@
 
 #define Z "z"
 #ifdef _WIN32
+#	ifndef __STDC_NO_THREADS__
+#		define __STDC_NO_THREADS__
+#	endif
 #	undef I64
 #	undef Z
 #	define I64 "I64"
@@ -62,7 +71,6 @@
 #endif // _WIN32
 
 #if !(AOC_COMPAT & AC_POSIX)
-#include <stdio.h>
 #include <stddef.h>
 
 ssize_t getline(char **line_buf, size_t *line_len, FILE *file);
@@ -77,7 +85,6 @@ void* reallocarray(void*ptr, size_t nmemb, size_t size);
 #endif
 
 #ifdef INTERACTIVE
-#include <stdio.h>
 
 extern int day;
 extern int part;

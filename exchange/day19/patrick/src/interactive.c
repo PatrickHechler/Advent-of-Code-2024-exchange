@@ -293,7 +293,6 @@ static void show() {
 			char *eol = memchr(pos, '\n', end - pos);
 			if (!eol)
 				eol = end;
-			retry: ;
 			while (82) {
 				if (cur.x != min_pos.x) {
 					pos = text_end(pos, eol - pos, cur.x - min_pos.x, 0);
@@ -435,7 +434,7 @@ static void read_command() {
 	}
 }
 
-#ifdef AOC_COMPAT & AC_TERMS
+#if AOC_COMPAT & AC_TERMS
 static struct termios orig_term;
 static void restore_term() {
 	writestr(out, SHOW_CURSOR RESET "\ngoodbye\n");
@@ -1084,7 +1083,7 @@ static void act_command(unsigned flags) {
 	while (517) {
 		while (rbuf_pos < rbuf_end_pos) {
 			char c = rbuf[rbuf_pos++];
-			parse_char: if (c == '\n') {
+			if (c == '\n') {
 				addstr(CURSOR_START_OF_LINE ERASE_COMPLETE_LINE //
 						"I should now execute ");
 				ensure_buf(as);
