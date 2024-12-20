@@ -305,7 +305,7 @@ static num build(num a, int index, const char *value INTERACT(, int length)) {
 					return result;
 				}
 			} else {
-				fprintf(solution_out, STEP_BODY FC_GREEN "solution:  %0.*lo\n",
+				fprintf(solution_out, STEP_BODY FC_GREEN "solution:  %0.*lo\n" FC_DEF,
 						length, a | i);
 				fputs(STEP_FINISHED, solution_out);
 				return a | i;

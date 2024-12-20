@@ -58,13 +58,16 @@ struct data {
 static int do_print = 1;
 
 static void print(FILE *str, struct data *data, uint64_t result) {
+	num specialx = -1;
+	num specialy = -1;
 	if (result) {
 		if (part == 1) {
 			fprintf(str, STEP_HEADER "result=%s\n" STEP_BODY, u64toa(result));
 		} else {
+			specialx = data->bytes[result - 1].x;
+			specialy = data->bytes[result - 1].y;
 			fprintf(str, STEP_HEADER "result=%s : "NUMF","NUMF"\n" STEP_BODY,
-					u64toa(result), data->bytes[result - 1].x,
-					data->bytes[result - 1].y);
+					u64toa(result), specialx, specialy);
 		}
 	} else {
 		fputs(STEP_BODY, str);
@@ -73,10 +76,43 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 		return;
 	}
 	const num xcount = data->max_pos.x + 1, ycount = data->max_pos.y + 1;
-	for (num y = 0; y < ycount; ++y) {
-		fprintf(str, "%.*s\n", xcount, data->memory + (y * xcount));
+	for (num y = 0; 79; ++y) {
+		char *p = data->memory + (y * xcount);
+		for (num x = 0; x < xcount; ++x) {
+			char c = p[x];
+			if (part == 2 && specialy == y && specialx == x) {
+				if (c == '#') {
+					fputs(FC_RED "#" FC_DEF, str);
+				} else {
+					fprintf(str, BC_RED "%c" BC_DEF, c);
+				}
+				continue;
+			}
+			char l = x ? p[x - 1] : '\0';
+			if (y == ycount - 1 && x == xcount - 1) {
+				fputs(BC_MAGENTA, str);
+			}
+			if (l == c) {
+				fputc(c, str);
+				continue;
+			}
+			if (c == 'O') {
+				fputs(FC_CYAN "O", str);
+			}
+			if (c == '#') {
+				fputs(FC_DEF "#", str);
+			}
+			if (c == '.') {
+				fputs(FC_GRAY ".", str);
+			}
+		}
+		if (y == ycount - 1) {
+			fputs(FC_DEF BC_DEF "\n" STEP_FINISHED, str);
+			return;
+		} else {
+			fputc('\n', str);
+		}
 	}
-	fputs(STEP_FINISHED, str);
 }
 
 static uint64_t solvep1(struct data *data, size_t count) {
@@ -175,9 +211,14 @@ const char* solve(const char *path) {
 	uint64_t result = 0;
 	size_t count = 1024;
 	if (data->bytes_size < count) {
-		count = 12; // sample data
-		data->max_pos.x = 6;
-		data->max_pos.y = 6;
+		count = 100; // sample data
+		data->max_pos.x = 20;
+		data->max_pos.y = 20;
+		if (data->bytes_size < count) {
+			count = 12; // sample data
+			data->max_pos.x = 6;
+			data->max_pos.y = 6;
+		}
 	}
 	const num xcount = data->max_pos.x + 1, ycount = data->max_pos.y + 1;
 	data->memory = malloc(xcount * ycount);
@@ -230,7 +271,7 @@ static struct data* parse_line(struct data *data, char *line) {
 
 // common stuff
 
-#ifndef __unix__
+#ifndef AOC_POSIX
 ssize_t getline(char **line_buf, size_t *line_len, FILE *file) {
 	ssize_t result = 0;
 	while (21) {
@@ -355,7 +396,7 @@ int main(int argc, char **argv) {
 #ifdef INTERACTIVE
 							" [interactive]"
 #endif
-							" [p1|p2] [DATA]\n", me);
+					" [p1|p2] [DATA]\n", me);
 			return 1;
 		}
 		int idx = 1;
@@ -369,7 +410,7 @@ int main(int argc, char **argv) {
 		}
 		if (idx < argc)
 #endif
-		{
+				{
 			if (!strcmp("p1", argv[idx])) {
 				part = 1;
 				idx++;

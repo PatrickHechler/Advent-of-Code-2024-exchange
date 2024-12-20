@@ -6,8 +6,6 @@ endif
 
 TARGET = aoc
 
-CFLAGS += -Wstrict-overflow=5 -pedantic
-
 ifeq ($(BUILD_MODE),)
 	BUILD_MODE = debug
 endif
@@ -18,6 +16,8 @@ else ifeq ($(BUILD_MODE),run)
 else
     $(error Build mode $(BUILD_MODE) not supported by this Makefile)
 endif
+
+CFLAGS += -Wstrict-overflow=5 -pedantic
 
 BIN_ROOT = $(PROJECT_ROOT)bin/
 
