@@ -1,6 +1,7 @@
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -182,31 +183,33 @@ public class Y24Day20 {
 		
 		record Cheat(Pos startPos, Pos endPos) {}
 		
-		public int countLongCheats(int minSavings, int picos) {
+		public int countLongCheats(int minSavings, int maxPicos) {
 			Set<Cheat> cheats = new HashSet<>();
-			cStartPos = null;
-			cEndPos = null;
-			output.addStep(toString());
 			int result = 0;
 			for (Pos pathPos:distances.keySet()) {
 				int cheatStartDist = distances.get(pathPos);
-				for (int dx = 0; dx<=picos; dx++) {
-					int dy = picos-dx;
-					Pos[] cheatEndPosList = {pathPos.add(dx, dy),pathPos.add(-dx, dy),pathPos.add(dx, -dy),pathPos.add(-dx, -dy)}; 
-					for (Pos cheatEndPos:cheatEndPosList) {
+				for (int dx = -maxPicos; dx<=maxPicos; dx++) {
+					for (int dy = -(maxPicos-Math.abs(dx)); dy<=maxPicos-Math.abs(dx); dy++) {
+						Pos cheatEndPos = pathPos.add(dx, dy); 
 						if (isWall(cheatEndPos)) {
 							continue;
 						}
+						int steps = Math.abs(dx)+Math.abs(dy);
 						int cheatEndDist = distances.get(cheatEndPos);
-						if (cheatEndDist-cheatStartDist-picos>=minSavings) {
-							cStartPos = pathPos;
-							cEndPos = cheatEndPos;
+						if (cheatEndDist-cheatStartDist-steps>=minSavings) {
 							cheats.add(new Cheat(pathPos, cheatEndPos));
-//							output.addStep(toString());
 						}
 					}
 				}
 			}
+//			List<Cheat> sortedCheats = new ArrayList<>(cheats);
+//			Collections.sort(sortedCheats, (c1,c2) -> c1.toString().compareTo(c2.toString()));
+//			for (Cheat cheat:sortedCheats) {
+//				cStartPos = cheat.startPos;
+//				cEndPos = cheat.endPos;
+//				output.addStep(toString());
+//			}
+			
 			return cheats.size();
 		}
 	}
@@ -258,10 +261,10 @@ public class Y24Day20 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day20/feri/input-example.txt", 2, 12);
-//		mainPart2("exchange/day20/feri/input-example.txt", 7, 12);
-//		mainPart2("exchange/day20/feri/input.txt", 20, 100);    // > 123135
-		mainPart2("exchange/day20/feri/input.txt", 2, 100);    
+//		mainPart2("exchange/day20/feri/input-example.txt", 2, 12);
+//		mainPart2("exchange/day20/feri/input-example.txt", 20, 50);
+		mainPart2("exchange/day20/feri/input.txt", 20, 100);    // > 123135   not 2516965
+//		mainPart2("exchange/day20/feri/input.txt", 2, 100);    
 		System.out.println("---------------");
 	}
 
