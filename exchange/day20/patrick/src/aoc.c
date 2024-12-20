@@ -103,7 +103,7 @@ static void find_free_pos(struct data *data, struct pos *p, int set_dir) {
 	}
 }
 
-static uint64_t calc_turns(struct data *data, num startx, num starty) {
+static num calc_turns(struct data *data, num startx, num starty) {
 	struct pos p = { startx, starty };
 	for (num cnt = 0; 77; ++cnt) {
 		switch (data->lines[p.y][p.x]) {
@@ -148,13 +148,52 @@ static uint64_t calc_turns(struct data *data, num startx, num starty) {
 	}
 }
 
-static uint64_t cheat(struct data *data, num x, num y, num addx, num addy) {
-	char old = data->lines[y + addy][x + addx];
-	data->lines[y + addy][x + addx] = 'E';
-	uint64_t saved = calc_turns(data, x, y) - 2;
-	data->lines[y + addy][x + addx] = old;
+static num cheat(struct data *data, num cheat_turns, num srcx, num srcy,
+		num dstx, num dsty) {
+	char old = data->lines[dsty][dstx];
+	data->lines[dsty][dstx] = 'E';
+	uint64_t saved = calc_turns(data, srcx, srcy) - cheat_turns;
+	data->lines[dsty][dstx] = old;
 	printf("saved %"I64"u turns\n", saved);
 	return saved;
+}
+
+static uint64_t p_h(const void *a) {
+	const struct pos *p = a;
+	return p->x * 31 + p->y;
+}
+static int p_eq(const void *a, const void *b) {
+	const struct pos *p0 = a, *p1 = b;
+	return p0->x == p1->x && p0->y == p1->y;
+}
+
+const num min_saved = 100;
+
+static void recursive_cheat(struct data *data, struct hashset *cheats,
+		num startx, num starty, num x, num y, uint64_t *counter) {
+	if (x < 0 || y < 0 || x >= data->line_length || y >= data->line_count) {
+		return;
+	}
+	struct pos *p = malloc(sizeof(struct pos));
+	p->x = x;
+	p->y = y;
+	if (hs_set(cheats, p)) {
+		return;
+	}
+	uint64_t turns = 0;
+	turns += startx > x ? startx - x : x - startx;
+	turns += starty > y ? starty - y : y - starty;
+	if (turns < 20) {
+		recursive_cheat(data, cheats, startx, starty, x + 1, y, counter);
+		recursive_cheat(data, cheats, startx, starty, x - 1, y, counter);
+		recursive_cheat(data, cheats, startx, starty, x, y + 1, counter);
+		recursive_cheat(data, cheats, startx, starty, x, y - 1, counter);
+	}
+	if (data->lines[y][x] != '#') {
+		if (cheat(data, turns, startx, starty, x, y) >= min_saved) {
+			++*counter;
+		}
+	}
 }
 
 const char* solve(const char *path) {
@@ -168,29 +207,39 @@ const char* solve(const char *path) {
 	num x = data->start.x, y = data->start.y;
 	uint64_t turns = calc_turns(data, x, y);
 	int cont = 160;
-	const num min_saved = 100;
+	struct hashset cheats = { .hash = p_h, .equal = p_eq, .free = free };
 	while (cont) {
 		print(solution_out, data, result);
 		char c = data->lines[y][x];
-		if (y >= 2 && data->lines[y - 2][x] != '#'
-				&& data->lines[y - 1][x] == '#'
-				&& cheat(data, x, y, 0, -2) >= min_saved) {
-			result++;
-		}
-		if (y + 2 < data->line_count && data->lines[y + 2][x] != '#'
-				&& data->lines[y + 1][x] == '#'
-				&& cheat(data, x, y, 0, 2) >= min_saved) {
-			result++;
-		}
-		if (x >= 2 && data->lines[y][x - 2] != '#'
-				&& data->lines[y][x - 1] == '#'
-				&& cheat(data, x, y, -2, 0) >= min_saved) {
-			result++;
-		}
-		if (x + 2 < data->line_length && data->lines[y][x + 2] != '#'
-				&& data->lines[y][x + 1] == '#'
-				&& cheat(data, x, y, 2, 0) >= min_saved) {
-			result++;
+		if (part == 1) {
+			if (y >= 2 && data->lines[y - 2][x] != '#'
+					&& data->lines[y - 1][x] == '#'
+					&& cheat(data, 2, x, y, x, y - 2) >= min_saved) {
+				result++;
+			}
+			if (y + 2 < data->line_count && data->lines[y + 2][x] != '#'
+					&& data->lines[y + 1][x] == '#'
+					&& cheat(data, 2, x, y, x, y + 2) >= min_saved) {
+				result++;
+			}
+			if (x >= 2 && data->lines[y][x - 2] != '#'
+					&& data->lines[y][x - 1] == '#'
+					&& cheat(data, 2, x, y, x - 2, y) >= min_saved) {
+				result++;
+			}
+			if (x + 2 < data->line_length && data->lines[y][x + 2] != '#'
+					&& data->lines[y][x + 1] == '#'
+					&& cheat(data, 2, x, y, x + 2, y) >= min_saved) {
+				result++;
+			}
+		} else {
+			struct pos *p = malloc(sizeof(struct pos));
+			hs_set(&cheats, p);
+			recursive_cheat(data, &cheats, x, y, x + 1, y, &result);
+			recursive_cheat(data, &cheats, x, y, x - 1, y, &result);
+			recursive_cheat(data, &cheats, x, y, x, y + 1, &result);
+			recursive_cheat(data, &cheats, x, y, x, y - 1, &result);
+			hs_clear(&cheats);
 		}
 		data->lines[y][x] = '#';
 		switch (c) {
