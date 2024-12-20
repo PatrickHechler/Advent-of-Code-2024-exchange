@@ -610,7 +610,7 @@ void interact(char *path, int force_interactive) {
 		exit(EXIT_FAILURE);
 	}
 #endif // AC_POSIX
-	buf_capacity = 4096;
+	buf_capacity = 16384;
 	buf = malloc(buf_capacity);
 	if (!buf) {
 		perror("malloc");
@@ -1283,10 +1283,16 @@ static void init_acts() {
 	incomp_action(ESC "[6;");
 	incomp_action(ESC "[5;");
 	incomp_action(ESC "[6;5");
+	incomp_action(ESC "[6;2");
 	incomp_action(ESC "[5;5");
-	bind_action(ESC "[6;5~", next_world, FLAG_CTRL, "Shift+Page-Down:\n"
+	incomp_action(ESC "[5;2");
+	bind_action(ESC "[6;5~", next_world, FLAG_CTRL, "Ctrl+Page-Down:\n"
 			"go 10 worlds forward");
-	bind_action(ESC "[5;5~", next_world, FLAG_CTRL, "Shift+Page-Up:\n"
+	bind_action(ESC "[5;5~", prev_world, FLAG_CTRL, "Ctrl+Page-Up:\n"
+			"got 10 worlds back");
+	bind_action(ESC "[6;2~", next_world, FLAG_SHIFT, "Shift+Page-Down:\n"
+			"go 10 worlds forward");
+	bind_action(ESC "[5;2~", prev_world, FLAG_SHIFT, "Shift+Page-Up:\n"
 			"got 10 worlds back");
 
 	bind_action(":", command, 0, "<colon (':')>:\n"
