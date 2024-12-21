@@ -66,14 +66,42 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 	}
 	fputs(interactive ? STEP_FINISHED : RESET, str);
 }
-/*
-##########--------
-<vA<AA>>^AvAA<^A>A<v<A>>^AvA^A<vA>^A<v<A>^A>AAvA^A<v<A>A>^AAAvA<^A>A
-  v <<   A >>  ^ A   <   A > A  v  A   <  ^ AA > A   < v  AAA >  ^ A
-         <       A       ^   A     >        ^^   A        vvv      A
-                 0           2                   9                 A
- */
-static uint64_t calc_sortest(char *code, size_t above_count) {
+
+struct result {
+	char *str;
+	uint64_t above_count;
+	uint64_t result;
+};
+
+static uint64_t r_h(const void *a) {
+	const struct result *r = a;
+	uint64_t result = r->above_count;
+	for (const char *c = r->str; *c; ++c) {
+		result = result * 31 + *c;
+	}
+	return result;
+}
+
+static int r_eq(const void *a, const void *b) {
+	const struct result *r0 = a, *r1 = b;
+	return r0->above_count == r1->above_count && !strcmp(r0->str, r1->str);
+}
+
+static void r_free(void *a) {
+	free(((struct result*) a)->str);
+	free(a);
+}
+
+static uint64_t calc_sortest(char *code, size_t above_count,
+		struct hashset *cache) {
+	struct result r0 = { .str = code, .above_count = above_count };
+	struct result *r = hs_get(cache, &r0);
+	if (r) {
+		return r->result;
+	}
+	r = malloc(sizeof(struct result));
+	r->str = strdup(code);
+	r->above_count = above_count;
 	struct pos A = { 2, (*code >= '0' && *code <= '9') ? 3 : 0 };
 	struct pos hole = { 0, A.y };
 	struct pos bot = A;
@@ -128,6 +156,8 @@ static uint64_t calc_sortest(char *code, size_t above_count) {
 			dst.x = 1;
 			dst.y = 3;
 			break;
+		default:
+			exit(4);
 		}
 		uint64_t min_add = UINT64_MAX;
 		num dx = dst.x - bot.x;
@@ -147,7 +177,7 @@ static uint64_t calc_sortest(char *code, size_t above_count) {
 					memset(buf + adx, myc, ady);
 					buf[len] = 'A';
 					buf[len + 1] = 0;
-					len = calc_sortest(buf, above_count - 1);
+					len = calc_sortest(buf, above_count - 1, cache);
 				} else {
 					++len;
 				}
@@ -168,14 +198,14 @@ static uint64_t calc_sortest(char *code, size_t above_count) {
 				memset(buf + adx, myc, ady);
 				buf[len] = 'A';
 				buf[len + 1] = 0;
-				len = calc_sortest(buf, above_count - 1);
+				len = calc_sortest(buf, above_count - 1, cache);
 			} else {
 				++len;
 			}
 			if (len < min_add)
 				min_add = len;
 		}
-		if (bot.x || dst.y != hole.y) {
+		if ((bot.x || dst.y != hole.y)) {
 			char myc = 'v', mxc = '>';
 			num ady = dy, adx = dx;
 			if (dy < 0) {
@@ -193,7 +223,7 @@ static uint64_t calc_sortest(char *code, size_t above_count) {
 				memset(buf + ady, mxc, adx);
 				buf[len] = 'A';
 				buf[len + 1] = 0;
-				len = calc_sortest(buf, above_count - 1);
+				len = calc_sortest(buf, above_count - 1, cache);
 			} else {
 				++len;
 			}
@@ -203,6 +233,8 @@ static uint64_t calc_sortest(char *code, size_t above_count) {
 		result += min_add;
 		bot = dst;
 	}
+	r->result = result;
+	hs_set(cache, r);
 	return result;
 }
 
@@ -210,6 +242,7 @@ const char* solve(const char *path) {
 	struct data *data = read_data(path);
 	uint64_t result = 0;
 	print(solution_out, data, result);
+	struct hashset hs = { .hash = r_h, .equal = r_eq, .free = r_free };
 	for (int i = 0; i < data->codes_count; ++i) {
 		char *code = data->codes[i];
 		char *end;
@@ -218,7 +251,7 @@ const char* solve(const char *path) {
 			fprintf(stderr, "invalid code %s\n", code);
 			exit(2);
 		}
-		uint64_t len = calc_sortest(code, 3);
+		uint64_t len = calc_sortest(code, part == 1 ? 3 : 26, &hs);
 		printf("the code is %s\n"
 				"the add result %"I64"u = %"I64"u * %"I64"u\n", code, len * val,
 				len, val);

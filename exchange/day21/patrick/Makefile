@@ -10,7 +10,7 @@ ifeq ($(BUILD_MODE),)
 	BUILD_MODE = debug
 endif
 ifeq ($(BUILD_MODE),debug)
-	CFLAGS += -g # -Og
+	CFLAGS += -g -Og
 else ifeq ($(BUILD_MODE),run)
 	CFLAGS += -Ofast -Wstrict-overflow=5
 else
