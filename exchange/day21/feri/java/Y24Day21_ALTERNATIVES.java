@@ -12,7 +12,7 @@ import java.util.Set;
  * see: https://adventofcode.com/2024/day/21
  *
  */
-public class Y24Day21 {
+public class Y24Day21_ALTERNATIVES {
 	
 	static String[] NUMERIC_KEYPAD_KEYS = {
 			"789",
@@ -80,18 +80,6 @@ public class Y24Day21 {
 				len = alternative.length();
 			}
 		}
-		public void addALL(AlternativeStringBuilder alternative) {
-			if (alternativesList == null) {
-				alternativesList = new ArrayList<>();
-				sequence = false;
-				len = Integer.MAX_VALUE;
-			}
-			if (isSequence()) {
-				throw new RuntimeException("AlternativeStringBuilder is a sequence");
-			}
-			alternativesList.add(alternative);
-			len = Math.min(len, alternative.length());
-		}
 		public void append(AlternativeStringBuilder alternatives) {
 			if (alternativesList == null) {
 				alternativesList = new ArrayList<>();
@@ -117,63 +105,6 @@ public class Y24Day21 {
 			}
 			return "UNDEF";
 		}
-		public String showAlternatives() {
-			if (isValue()) {
-				return value;
-			}
-			if (isAlternative()) {
-				return "("+join(alternativesList, "|")+")";
-			}
-			if (isSequence()) {
-				return join(alternativesList, "");
-			}
-			return "UNDEF";
-		}
-		public void showAlternativeList() {
-			for (String alt:getAlternatives()) {
-				System.out.println(alt);
-			}
-		}
-		public List<String> getAlternatives() {
-			List<String> result = new ArrayList<>();
-			if (isValue()) {
-				result.add(value);
-				return result;
-			}
-			if (isAlternative()) {
-				for (AlternativeStringBuilder alternative:alternativesList) {
-					result.addAll(alternative.getAlternatives());
-				}
-				return result;
-			}
-			if (isSequence()) {
-				result.add("");
-				for (AlternativeStringBuilder alternative:alternativesList) {
-					List<String> nextAlts = alternative.getAlternatives();
-					List<String> newResult = new ArrayList<>(); 
-					for (String nextAlt:nextAlts) {
-						for (String oldResult:result) {
-							newResult.add(oldResult+nextAlt);
-						}
-					}
-					result = newResult;
-				}
-				return result;
-			}
-			throw new RuntimeException("?");
-		}
-
-		private String join(List<AlternativeStringBuilder> list, String seperator) {
-			StringBuilder result = new StringBuilder();
-			for (AlternativeStringBuilder asb:list) {
-				if (!result.isEmpty()) {
-					result.append(seperator);
-				}
-				result.append(asb.showAlternatives());
-			}
-			return result.toString();
-		}
-
 	}
 	
 	public static class KeyPad {
@@ -210,7 +141,7 @@ public class Y24Day21 {
 				for (AlternativeStringBuilder codeSegment:codeAlternatives.alternativesList) {
 					currentPos = startPos;
 					AlternativeStringBuilder typedCodeSegment = type(codeSegment); 
-					result.addALL(typedCodeSegment);
+					result.addMinimal(typedCodeSegment);
 				}
 			}
 			if (codeAlternatives.isSequence()) {
@@ -291,8 +222,8 @@ public class Y24Day21 {
 				else {
 					AlternativeStringBuilder result1 = result;
 					result = new AlternativeStringBuilder();
-					result.addALL(result1);
-					result.addALL(result2);
+					result.addMinimal(result1);
+					result.addMinimal(result2);
 				}
 			}
 			currentPos = targetPos;
@@ -324,10 +255,7 @@ public class Y24Day21 {
 			for (String code:codes) {
 				System.out.println("--- "+code+" ---");
 				AlternativeStringBuilder dirCodes = typeRobCodes(numRobs-1, new AlternativeStringBuilder(code));
-				System.out.println(dirCodes.showAlternatives());
-				System.out.println("----------------------------------");
-				dirCodes.showAlternativeList();
-				System.out.println("----------------------------------");
+				System.out.println(dirCodes);
 				int len = dirCodes.length();
 				System.out.println(code+": "+len+" ");
 				int codeNum = Integer.parseInt(code.replace("A", ""));
@@ -342,12 +270,7 @@ public class Y24Day21 {
 			}
 			else {
 				AlternativeStringBuilder childRobCodes = typeRobCodes(robNr-1, codeAlternatives);
-				System.out.println("--------- ROB "+robNr+" ------------");
-				System.out.println(childRobCodes.showAlternatives());
-				System.out.println("----------------------------------");
-				childRobCodes.showAlternativeList();
-				System.out.println("----------------------------------");
-				
+//				System.out.println(childRobCodes);
 				return robKeyPads[robNr].type(childRobCodes);
 			}
 		}
@@ -393,13 +316,13 @@ public class Y24Day21 {
 //		mainPart1("exchange/day21/feri/input-example.txt");
 //		mainPart1("exchange/day21/feri/input-example-1.txt");
 //		mainPart1("exchange/day21/feri/input-example-2.txt");
-//		mainPart1("exchange/day21/feri/input.txt");     // == 238078
+		mainPart1("exchange/day21/feri/input.txt");     // == 238078
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
 //		mainPart2("exchange/day21/feri/input-example.txt");
 //		mainPart2("exchange/day21/feri/input-example-1.txt");
-		mainPart2("exchange/day21/feri/input-example-2.txt", 3);
+//		mainPart2("exchange/day21/feri/input-example-2.txt", 3);
 //		mainPart2("exchange/day21/feri/input.txt");    
 		System.out.println("---------------");
 	}
