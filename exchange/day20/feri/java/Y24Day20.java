@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -22,7 +24,7 @@ public class Y24Day20 {
 	static final int[] DIR_X    = {  0,   1,   0,  -1};
 	static final int[] DIR_Y    = { -1,   0,   1,   0};
 	
-	record Pos(int x, int y) {
+	record Pos(int x, int y) implements Comparable<Pos> {
 		@Override public String toString() {
 			return "("+x+","+y+")";
 		}
@@ -40,6 +42,46 @@ public class Y24Day20 {
 		}
 		public Pos add(int dx, int dy) {
 			return new Pos(x+dx,y+dy);
+		}
+		public List<Pos> calcPath(Pos targetPos) {
+			List<Pos> result = new ArrayList<>();
+			Pos current = this;
+			while (true) {
+				result.add(current);
+				if (current.equals(targetPos)) {
+					break;
+				}
+				current = current.moveOne(targetPos);
+			}
+			return result;
+		}
+		private Pos moveOne(Pos targetPos) {
+			int dx = targetPos.x-x;
+			int dy = targetPos.y-y;
+			if (Math.abs(dx) > Math.abs(dy)) {
+				return new Pos(x+(int)Math.signum(dx), y);
+			}
+			return new Pos(x,y+(int)Math.signum(dy));
+		}
+		@Override
+		public int compareTo(Pos other) {
+			int result = Integer.compare(y, other.y);
+			if (result == 0) {
+				result = Integer.compare(x, other.x);
+			}
+			return result;
+		}
+		public Pos min(Pos other) {
+			if (compareTo(other)<=0) {
+				return this;
+			}
+			return other;
+		}
+		public Pos max(Pos other) {
+			if (compareTo(other)>=0) {
+				return this;
+			}
+			return other;
 		}
 	}
 
@@ -181,11 +223,28 @@ public class Y24Day20 {
 			return result;
 		}
 		
-		record Cheat(Pos startPos, Pos endPos) {}
+		record Cheat(Pos startPos, Pos endPos, int dist) implements Comparable<Cheat> {
+
+			@Override
+			public int compareTo(Cheat other) {
+				Pos minPos = startPos.min(endPos);
+				Pos maxPos = startPos.max(endPos);
+				Pos otherMinPos = other.startPos.min(other.endPos);
+				Pos otherMaxPos = other.startPos.max(other.endPos);
+				int result = minPos.compareTo(otherMinPos);
+				if (result == 0) {
+					result = maxPos.compareTo(otherMaxPos);
+					if (result == 0) {
+						result = Integer.compare(dist, other.dist);
+					}
+				}
+				return result;
+			}
+			
+		}
 		
 		public int countLongCheats(int minSavings, int maxPicos) {
 			Set<Cheat> cheats = new HashSet<>();
-			int result = 0;
 			for (Pos pathPos:distances.keySet()) {
 				int cheatStartDist = distances.get(pathPos);
 				for (int dx = -maxPicos; dx<=maxPicos; dx++) {
@@ -196,21 +255,75 @@ public class Y24Day20 {
 						}
 						int steps = Math.abs(dx)+Math.abs(dy);
 						int cheatEndDist = distances.get(cheatEndPos);
-						if (cheatEndDist-cheatStartDist-steps>=minSavings) {
-							cheats.add(new Cheat(pathPos, cheatEndPos));
+						int skipDist = cheatEndDist-cheatStartDist-steps;
+						if (skipDist>=minSavings) {
+							cheats.add(new Cheat(pathPos, cheatEndPos, skipDist));
 						}
 					}
 				}
 			}
-//			List<Cheat> sortedCheats = new ArrayList<>(cheats);
-//			Collections.sort(sortedCheats, (c1,c2) -> c1.toString().compareTo(c2.toString()));
-//			for (Cheat cheat:sortedCheats) {
-//				cStartPos = cheat.startPos;
-//				cEndPos = cheat.endPos;
-//				output.addStep(toString());
-//			}
-			
+			List<Cheat> sortedCheats = new ArrayList<>(cheats);
+			Collections.sort(sortedCheats);
+			Map<Pos, Cheat> bestCheats = new LinkedHashMap<>();
+			for (Cheat cheat:sortedCheats) {
+				Cheat bestCheat = bestCheats.get(cheat.startPos);
+				if ((bestCheat == null) || bestCheat.dist < cheat.dist) {
+					bestCheats.put(cheat.startPos, cheat);
+				}
+			}
+			Map<Pos, Cheat> bestEndPosCheats = new LinkedHashMap<>();
+			for (Cheat bestCheat:bestCheats.values()) {
+				Cheat bestEndPosCheat = bestEndPosCheats.get(bestCheat.endPos);
+				if ((bestEndPosCheat == null) || bestEndPosCheat.dist < bestCheat.dist) {
+					bestEndPosCheats.put(bestCheat.endPos, bestCheat);
+				}
+			}
+			List<Cheat> selectedCheats = new ArrayList<>(bestEndPosCheats.values());
+			Collections.sort(selectedCheats);
+			for (Cheat selectedCheat:selectedCheats) {
+				showCheat(selectedCheat);
+			}
 			return cheats.size();
+		}
+
+		private void showCheat(Cheat cheat) {
+			Pos cheatStartPos = cheat.startPos;
+			Pos cheatEndPos = cheat.endPos;
+			int cheatStartDist = distances.get(cheatStartPos);
+			int cheatEndDist = distances.get(cheatEndPos);
+			Set<Pos> cheatPath = new LinkedHashSet(cheatStartPos.calcPath(cheatEndPos));
+			String lastColor = "b0";
+			StringBuilder result = new StringBuilder();
+			result.append("Cheat: "+cheat.dist+"\n");
+			for (int y=0; y<maxY; y++) {
+				for (int x=0; x<maxX; x++) {
+					Pos p = new Pos(x,y);
+					String color = "b0";
+					if (distances.containsKey(p)) {
+						int dist = distances.get(p);
+						if ((dist < cheatStartDist) || (dist > cheatEndDist)) {
+							color = "b2";
+						}
+					}
+					if (cheatPath.contains(p)) {
+						color = "b3";
+					}
+					char c = get(x,y);
+					if (startPos.eq(x,y)) {
+						c = 'S';
+					}
+					else if (endPos.eq(x,y)) {
+						c = 'E';
+					}
+					if (color != lastColor) {
+						lastColor = color;
+						result.append(output.style(color));
+					}
+					result.append(c);
+				}
+				result.append('\n');
+			}
+			output.addStep(result.toString());
 		}
 	}
 
@@ -248,6 +361,7 @@ public class Y24Day20 {
 			}
 		}
 		world.calcShortestPath();
+		output.addStep(world.toString());
 		int countLongCheats = world.countLongCheats(minSavings, cheatLen);
 		System.out.println("countLongCheats="+countLongCheats);
 	}
@@ -262,9 +376,10 @@ public class Y24Day20 {
 		System.out.println();
 		System.out.println("--- PART II ---");
 //		mainPart2("exchange/day20/feri/input-example.txt", 2, 12);
-//		mainPart2("exchange/day20/feri/input-example.txt", 20, 50);
-		mainPart2("exchange/day20/feri/input.txt", 20, 100);    // > 123135   not 2516965
+//		mainPart2("exchange/day20/feri/input-example.txt", 4, 10);
+//		mainPart2("exchange/day20/feri/input.txt", 20,3000);    
 //		mainPart2("exchange/day20/feri/input.txt", 2, 100);    
+		mainPart2("exchange/day20/feri/input.txt", 20, 100);    
 		System.out.println("---------------");
 	}
 
