@@ -34,6 +34,7 @@ public class Y24Day21 {
 	}
 	
 	
+	
 	public static class AlternativeStringBuilder {
 		private String value;
 		private int len;
@@ -177,12 +178,14 @@ public class Y24Day21 {
 	}
 	
 	public static class KeyPad {
+		Map<String, Map<String, Long>> cache; 
 		Map<Character, Pos> keyPositions;
 		Set<Pos> forbiddenPositions;
 		Pos startPos;
 		Pos currentPos;
 		int maxY;
 		public KeyPad(String[] keys) {
+			cache = new HashMap<>();
 			keyPositions = new HashMap<>();
 			forbiddenPositions = new HashSet<>();
 			for (int y=0; y<keys.length; y++) {
@@ -199,6 +202,49 @@ public class Y24Day21 {
 				}
 			}
 			currentPos = startPos;
+		}
+		public Map<String, Long> splitAGroup(String commands) {
+			Map<String, Long> result = new HashMap<>();
+			String text = commands;
+			while (text.indexOf('A') != -1) {
+				int pos = text.indexOf('A');
+				String aGroup= text.substring(0,pos+1);
+				if (result.containsKey(aGroup)) {
+					result.put(aGroup, result.get(aGroup)+1);
+				}
+				else {
+					result.put(aGroup, 1L);
+				}
+				text = text.substring(pos+1);
+			}
+			return result;
+		}
+		public Map<String, Long> translate(Map<String, Long> aGroups) {
+			Map<String, Long> result = new HashMap<>();
+			for (String aGroup:aGroups.keySet()) {
+				long cnt = aGroups.get(aGroup);
+				Map<String, Long> translatedAGroups = translateAGroup(aGroup);
+				for (String translatedAGroup:translatedAGroups.keySet()) {
+					Long cntInTranslate = translatedAGroups.get(translatedAGroup);
+					if (result.containsKey(translatedAGroup)) {
+						result.put(translatedAGroup, result.get(translatedAGroup)+cnt*cntInTranslate);
+					}
+					else {
+						result.put(translatedAGroup, cnt*cntInTranslate);
+					}
+				}
+			}
+			return result;
+		}
+		public Map<String, Long> translateAGroup(String aGroup) {
+			if (cache.containsKey(aGroup)) {
+				return cache.get(aGroup);
+			}
+			AlternativeStringBuilder asb = type(aGroup);
+			String resultString = asb.getAlternatives().get(0);
+			Map<String, Long> result = splitAGroup(resultString);
+			cache.put(aGroup, result);
+			return result;
 		}
 		public AlternativeStringBuilder type(AlternativeStringBuilder codeAlternatives) {
 			AlternativeStringBuilder result = new AlternativeStringBuilder();
@@ -224,9 +270,54 @@ public class Y24Day21 {
 		public AlternativeStringBuilder type(String code) {
 			AlternativeStringBuilder result = new AlternativeStringBuilder();
 			for (char c:code.toCharArray()) {
-				result.append(navigateTo(c));
+				result.append(filter(navigateTo(c)));
 			}
 			return result;
+		}
+		private AlternativeStringBuilder filter(AlternativeStringBuilder alternatives) {
+			if (alternatives.isValue()) {
+				return alternatives;
+			}
+			AlternativeStringBuilder a1 = alternatives.alternativesList.get(0);
+			AlternativeStringBuilder a2 = alternatives.alternativesList.get(1);
+			String v1 = a1.value;
+			String v2 = a2.value;
+			
+			if (v1.equals(v2)) {
+				return a1;
+			}
+			
+			if (v1.startsWith("<") && (v2.startsWith("^"))) {
+				return a1; 
+			}
+			if (v1.startsWith("^") && (v2.startsWith("<"))) {
+				return a2; 
+			}
+			
+			if (v1.startsWith("v") && (v2.startsWith(">"))) {
+				return a1; 
+			}
+			if (v1.startsWith(">") && (v2.startsWith("v"))) {
+				return a2; 
+			}
+
+			
+			if (v1.startsWith("<") && (v2.startsWith("v"))) {
+				return a1; 
+			}
+			if (v1.startsWith("v") && (v2.startsWith("<"))) {
+				return a2; 
+			}
+			
+			if (v1.startsWith(">") && (v2.startsWith("^"))) {
+				return a2; 
+			}
+			if (v1.startsWith("^") && (v2.startsWith(">"))) {
+				return a1; 
+			}
+			
+			throw new RuntimeException("invalid filter");
+//			return a1;
 		}
 		public AlternativeStringBuilder navigateTo(char key) {
 			AlternativeStringBuilder result = null;
@@ -319,7 +410,30 @@ public class Y24Day21 {
 		public void addCode(String code) {
 			codes.add(code);
 		}
-		public int solve() {
+		public long solve() {
+			long result = 0;
+			for (String code:codes) {
+				System.out.println("--- "+code+" ---");
+				String initial = robKeyPads[0].type(code).getAlternatives().get(0);
+				Map<String, Long> aGroups = robKeyPads[0].splitAGroup(initial);
+				for (int i=1; i<numRobs; i++) {
+					System.out.println("--- NEW "+(i-1)+" ---");
+					System.out.println(aGroups);
+					aGroups = humanKeyPad.translate(aGroups);
+				}
+				long len = 0L;
+				for (String aGroup:aGroups.keySet()) {
+					Long cnt = aGroups.get(aGroup);
+					len += cnt*aGroup.length();
+				}
+				System.out.println(aGroups+" \nlen="+len);
+				Long codeNum = Long.parseLong(code.replace("A", ""));
+				result = result + len*codeNum;
+			}
+			return result;
+		}
+
+		public int solveOLD() {
 			int result = 0;
 			for (String code:codes) {
 				System.out.println("--- "+code+" ---");
@@ -327,7 +441,9 @@ public class Y24Day21 {
 				System.out.println(dirCodes.showAlternatives());
 				System.out.println("----------------------------------");
 				dirCodes.showAlternativeList();
-				System.out.println("----------------------------------");
+				System.out.println("-------------- OLD --------------------");
+				System.out.println(humanKeyPad.splitAGroup(dirCodes.getAlternatives().get(0)));
+				System.out.println("--------------  --------------------");
 				int len = dirCodes.length();
 				System.out.println(code+": "+len+" ");
 				int codeNum = Integer.parseInt(code.replace("A", ""));
@@ -336,6 +452,17 @@ public class Y24Day21 {
 			return result;
 		}
 
+		private Map<String, Long> translateRobCodes(int robNr, String code) {
+			if (robNr == 0) {
+				String initial = robKeyPads[0].type(code).getAlternatives().get(0);
+				return robKeyPads[0].splitAGroup(initial);
+			}
+			else {
+				Map<String, Long> childAGroups = translateRobCodes(robNr-1, code);
+				Map<String, Long> result = humanKeyPad.translate(childAGroups);
+				return result;
+			}
+		}
 		public AlternativeStringBuilder typeRobCodes(int robNr, AlternativeStringBuilder codeAlternatives) {
 			if (robNr == 0) {
 				return robKeyPads[0].type(codeAlternatives);
@@ -344,6 +471,8 @@ public class Y24Day21 {
 				AlternativeStringBuilder childRobCodes = typeRobCodes(robNr-1, codeAlternatives);
 				System.out.println("--------- ROB "+robNr+" ------------");
 				System.out.println(childRobCodes.showAlternatives());
+				System.out.println("-------------- OLD --------------------");
+				System.out.println(humanKeyPad.splitAGroup(childRobCodes.getAlternatives().get(0)));
 				System.out.println("----------------------------------");
 				childRobCodes.showAlternativeList();
 				System.out.println("----------------------------------");
@@ -397,10 +526,12 @@ public class Y24Day21 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-//		mainPart2("exchange/day21/feri/input-example.txt");
-//		mainPart2("exchange/day21/feri/input-example-1.txt");
-		mainPart2("exchange/day21/feri/input-example-2.txt", 3);
-//		mainPart2("exchange/day21/feri/input.txt");    
+//		mainPart2("exchange/day21/feri/input-example.txt", 3);
+//		mainPart2("exchange/day21/feri/input-example-1.txt", 3);
+//		mainPart2("exchange/day21/feri/input-example-2.txt", 3);
+//		mainPart2("exchange/day21/feri/input.txt", 25);      // > 134180557577040  < 335879439503508
+		mainPart2("exchange/day21/feri/input.txt", 26);      // > 134180557577040  < 335879439503508
+		//                                                                           475288764580252
 		System.out.println("---------------");
 	}
 
@@ -415,6 +546,31 @@ ROB2: <<vA>^A>A
 ROB1: ^<A
 ROB2: <Av<A^>>A
 2: v<<A^>>Av<A<A^>>A<Av>AA^A 25 
+
+-------------- OLD --------------------
+{A=3, >^A=1, >A=2, <A=1, <vA=1, vA=1, v<<A=1, >>^A=1, <^A=1}
+
+--- NEW 1 ---
+{A=2, >^A=1, >A=2, <A=1, <vA=1, vA=1, v<<A=1, >>^A=1, <^A=1}
+
+
+
+--- NEW 0 ---
+{^A=1, <A=1, vvvA=1, >^^A=1}
+-------------- OLD --------------------
+{^A=1, <A=1, vvvA=1, >^^A=1}
+
+
+--- NEW 1 ---
+{A=2, >^A=1, >A=2, <A=1, <vA=1, vA=1, v<<A=1, >>^A=1, <^A=1}
+-------------- OLD --------------------
+{A=3, >^A=1, >A=2, <A=1, <vA=1, vA=1, v<<A=1, >>^A=1, <^A=1}
+
+
+OLD
+<A       ^A     >^^A     vvvA
+v<<A>>^A <A>A   vA<^AA>A <vAAA>^A
+
 
 
 */	
