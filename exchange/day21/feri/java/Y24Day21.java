@@ -1,8 +1,11 @@
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -13,7 +16,6 @@ import java.util.Set;
  *
  */
 public class Y24Day21 {
-	
 	
 	static String[] NUMERIC_KEYPAD_KEYS = {
 			"789",
@@ -31,6 +33,49 @@ public class Y24Day21 {
 		@Override
 		public final String toString() {
 			return "("+x+","+y+")";
+		}
+	}
+	
+	
+	public static class AlternativeStringBuilder {
+		List<Set<String>> alternativesList;
+		public AlternativeStringBuilder() {
+			alternativesList = new ArrayList<>();
+		}
+		public void appendMinimal(Collection<String> alternatives) {
+			int minLength = Integer.MAX_VALUE;
+			Set<String> minAlternatives = new LinkedHashSet<>();
+			for (String alternative:alternatives) {
+				if (alternative.length()==minLength) {
+					minAlternatives.add(alternative);
+				}
+				else if (alternative.length()<minLength) {
+					minAlternatives.clear();
+					minAlternatives.add(alternative);
+					minLength = alternative.length();
+				}
+			}
+			alternativesList.add(minAlternatives);
+		}
+		public void appendMinimal(AlternativeStringBuilder alternatives) {
+			appendMinimal(alternatives.getAlternatives());
+		}
+		public void append(String alternative) {
+			alternativesList.add(new HashSet<>(Arrays.asList(alternative)));
+		}
+		public List<String> getAlternatives() {
+			List<String> result = new ArrayList<>();
+			result.add("");
+			for (Set<String> alternatives:alternativesList) {
+				List<String> nextResult = new ArrayList<>();
+				for (String previousResultString:result) {
+					for (String alternative:alternatives) {
+						nextResult.add(previousResultString+alternative);
+					}
+				}
+				result = nextResult;
+			}
+			return result;
 		}
 	}
 	
@@ -58,16 +103,17 @@ public class Y24Day21 {
 			}
 			currentPos = startPos;
 		}
-		public String type(String code) {
-			StringBuilder result = new StringBuilder();
+		public AlternativeStringBuilder type(String code) {
+			AlternativeStringBuilder asb = new AlternativeStringBuilder();
 			for (char c:code.toCharArray()) {
 //				result.append(" ["+c+"]");
-				result.append(navigateTo(c));
-				result.append("A");
+				asb.appendMinimal(navigateTo(c));
+				asb.append("A");
 			}
-			return result.toString();
+			return asb;
 		}
-		public String navigateTo(char key) {
+		public List<String> navigateTo(char key) {
+			List<String> result = new ArrayList<>();
 			Pos targetPos = keyPositions.get(key);
 			int x = currentPos.x;
 			int y = currentPos.y;
@@ -75,68 +121,69 @@ public class Y24Day21 {
 			int ty = targetPos.y;
 			int dx = targetPos.x-x;
 			int dy = targetPos.y-y;
-			// two possible was dx then dy, or dy then dx. Do not move over forbidden positions.
+			// two possible ways dx then dy, or dy then dx. Do not move over forbidden positions.
 			char mx = (dx>0) ? '>' : '<';
 			char my = (dy>0) ? 'v' : '^';
 			int sx = (int)Math.signum(dx);
 			int sy = (int)Math.signum(dy);
-			StringBuilder result = new StringBuilder();
+			StringBuilder way = new StringBuilder();
 			boolean valid = true;
 			for (int nx=x; nx!=tx; nx += sx) {
-				result.append(mx);
+				way.append(mx);
 				if (forbiddenPositions.contains(new Pos(nx,y))) {
 					valid = false;
 					break;
 				}
 			}
 			for (int ny=y; ny!=ty; ny += sy) {
-				result.append(my);
+				way.append(my);
 				if (forbiddenPositions.contains(new Pos(tx,ny))) {
 					valid = false;
 					break;
 				}
 			}
 			if (valid) {
-				currentPos = targetPos;
-				return result.toString();
+				result.add(way.toString());
 			}
-			result.setLength(0);
 			valid = true;
+			way.setLength(0);
 			for (int ny=y; ny!=ty; ny += sy) {
-				result.append(my);
+				way.append(my);
 				if (forbiddenPositions.contains(new Pos(x,ny))) {
 					valid = false;
 					break;
 				}
 			}
 			for (int nx=x; nx!=tx; nx += sx) {
-				result.append(mx);
+				way.append(mx);
 				if (forbiddenPositions.contains(new Pos(nx,ty))) {
 					valid = false;
 					break;
 				}
 			}
 			if (valid) {
-				currentPos = targetPos;
-				return result.toString();
+				result.add(way.toString());
 			}
-			return null;
+			currentPos = targetPos;
+			return result;
 		}
 	}
 
 	public static class World {
 		List<String> codes;
 		KeyPad humanKeyPad;
-		KeyPad rob3KeyPad;
-		KeyPad rob2KeyPad;
-		KeyPad rob1KeyPad;
+		KeyPad[] robKeyPads;
+		int numRobs;
 		
-		public World() {
+		public World(int numRobs) {
 			codes = new ArrayList<>();
 			humanKeyPad = new KeyPad(DIRECTIONAL_KEYPAD_KEYS);
-			rob3KeyPad = new KeyPad(DIRECTIONAL_KEYPAD_KEYS);
-			rob2KeyPad = new KeyPad(DIRECTIONAL_KEYPAD_KEYS);
-			rob1KeyPad = new KeyPad(NUMERIC_KEYPAD_KEYS);
+			this.numRobs = numRobs;
+			robKeyPads = new KeyPad[numRobs];
+			for (int i=1; i<numRobs; i++) {
+				robKeyPads[i] = new KeyPad(DIRECTIONAL_KEYPAD_KEYS);
+			}
+			robKeyPads[0] = new KeyPad(NUMERIC_KEYPAD_KEYS);
 		}
 		public void addCode(String code) {
 			codes.add(code);
@@ -144,30 +191,31 @@ public class Y24Day21 {
 		public int solve() {
 			int result = 0;
 			for (String code:codes) {
-				String dirCode = typeRob3Codes(code); 
-				System.out.println(code+": "+dirCode+" "+dirCode.length());
+				System.out.println("--- "+code+" ---");
+				List<String> dirCodes = typeRobCodes(numRobs-1, code);
+				String dirCode = dirCodes.get(0);
+				System.out.println(code+": "+dirCode+" "+dirCode.length()+" ");
 				int codeNum = Integer.parseInt(code.replace("A", ""));
 				result = result + dirCode.length()*codeNum;
 			}
 			return result;
 		}
 
-		public String typeRob3Codes(String code) {
-			String rob2code = typeRob2Codes(code);
-			String result = rob2KeyPad.type(rob2code);
-			return result;
+		public List<String> typeRobCodes(int robNr, String code) {
+			if (robNr == 0) {
+				return robKeyPads[0].type(code).getAlternatives();
+			}
+			else {
+				Set<String> alternatives = new LinkedHashSet<>();
+				List<String> childRobCodes = typeRobCodes(robNr-1, code);
+				for (String childRobCode:childRobCodes) {
+					alternatives.addAll(robKeyPads[robNr].type(childRobCode).getAlternatives());
+				}
+				AlternativeStringBuilder result = new AlternativeStringBuilder();
+				result.appendMinimal(alternatives);
+				return result.getAlternatives();
+			}
 		}
-		public String typeRob2Codes(String code) {
-			String rob1code = typeRob1Codes(code);
-			String result = rob2KeyPad.type(rob1code);
-			return result;
-		}
-		public String typeRob1Codes(String code) {
-			StringBuilder result = new StringBuilder();
-			result.append(rob1KeyPad.type(code));
-			return result.toString();
-		}
-		
 		@Override
 		public String toString() {
 			return codes.toString();
@@ -177,7 +225,7 @@ public class Y24Day21 {
 	
 	public static void mainPart1(String inputfile) throws FileNotFoundException {
 
-		World world = new World();
+		World world = new World(3);
 		try (Scanner scanner = new Scanner(new File(inputfile))) {
 			while (scanner.hasNext()) {
 				String line = scanner.nextLine().trim();
@@ -191,20 +239,47 @@ public class Y24Day21 {
 	}
 
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
+
+		World world = new World(25);
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line = scanner.nextLine().trim();
+				if (line.isBlank()) {
+					break;
+				}
+				world.addCode(line);
+			}
+		}
+		System.out.println(world.solve());
 	}
 	
 	public static void main(String[] args) throws FileNotFoundException {
 		System.out.println("--- PART I  ---");
-//		mainPart1("exchange/day21/feri/input-example-1.txt");
 //		mainPart1("exchange/day21/feri/input-example.txt");
-		mainPart1("exchange/day21/feri/input.txt");     // < 244490
+//		mainPart1("exchange/day21/feri/input-example-1.txt");
+//		mainPart1("exchange/day21/feri/input-example-2.txt");
+		mainPart1("exchange/day21/feri/input.txt");     // < 244490   // < 241370
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day21/feri/input-example.txt");
-//		mainPart2("exchange/day21/feri/input.txt");    
+//		mainPart2("exchange/day21/feri/input-example.txt");
+		mainPart2("exchange/day21/feri/input.txt");    
 		System.out.println("---------------");
 	}
 
+/*
+ 
+--- 2 ---
+ROB1: <^A
+ROB2: <<vA>^A>A
+2: <<vAA>A>^AvA<^A>AvA^A 21 
+
+--- 2 ---
+ROB1: ^<A
+ROB2: <Av<A^>>A
+2: v<<A^>>Av<A<A^>>A<Av>AA^A 25 
+
+
+*/	
 	
 }
