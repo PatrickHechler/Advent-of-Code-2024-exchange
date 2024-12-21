@@ -1,11 +1,8 @@
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -38,44 +35,75 @@ public class Y24Day21 {
 	
 	
 	public static class AlternativeStringBuilder {
-		List<Set<String>> alternativesList;
+		private String value;
+		private int len;
+		List<AlternativeStringBuilder> alternativesList;
+		boolean sequence;
+		public AlternativeStringBuilder(String singleValue) {
+			value = singleValue;
+			alternativesList = null;
+			sequence = false;
+			len = value.length();
+		}
 		public AlternativeStringBuilder() {
-			alternativesList = new ArrayList<>();
+			value = null;
+			alternativesList = null;
+			len = Integer.MAX_VALUE;
 		}
-		public void appendMinimal(Collection<String> alternatives) {
-			int minLength = Integer.MAX_VALUE;
-			Set<String> minAlternatives = new LinkedHashSet<>();
-			for (String alternative:alternatives) {
-				if (alternative.length()==minLength) {
-					minAlternatives.add(alternative);
-				}
-				else if (alternative.length()<minLength) {
-					minAlternatives.clear();
-					minAlternatives.add(alternative);
-					minLength = alternative.length();
-				}
+		public boolean isValue() {
+			return value != null;
+		}
+		public boolean isSequence() {
+			return sequence;
+		}
+		public boolean isAlternative() {
+			return !sequence;
+		}
+		public int length() {
+			return len;
+		}
+		public void addMinimal(AlternativeStringBuilder alternative) {
+			if (alternativesList == null) {
+				alternativesList = new ArrayList<>();
+				sequence = false;
+				len = Integer.MAX_VALUE;
 			}
-			alternativesList.add(minAlternatives);
-		}
-		public void appendMinimal(AlternativeStringBuilder alternatives) {
-			appendMinimal(alternatives.getAlternatives());
-		}
-		public void append(String alternative) {
-			alternativesList.add(new HashSet<>(Arrays.asList(alternative)));
-		}
-		public List<String> getAlternatives() {
-			List<String> result = new ArrayList<>();
-			result.add("");
-			for (Set<String> alternatives:alternativesList) {
-				List<String> nextResult = new ArrayList<>();
-				for (String previousResultString:result) {
-					for (String alternative:alternatives) {
-						nextResult.add(previousResultString+alternative);
-					}
-				}
-				result = nextResult;
+			if (isSequence()) {
+				throw new RuntimeException("AlternativeStringBuilder is a sequence");
 			}
-			return result;
+			if (alternative.length() == length()) {
+				alternativesList.add(alternative);
+			}
+			else if (alternative.length() < length()) {
+				alternativesList.clear();
+				alternativesList.add(alternative);
+				len = alternative.length();
+			}
+		}
+		public void append(AlternativeStringBuilder alternatives) {
+			if (alternativesList == null) {
+				alternativesList = new ArrayList<>();
+				sequence = true;
+				len = 0;
+			}
+			if (!isSequence()) {
+				throw new RuntimeException("AlternativeStringBuilder is not a sequence");
+			}
+			alternativesList.add(alternatives);
+			len += alternatives.length();
+		}
+		@Override
+		public String toString() {
+			if (isValue()) {
+				return value;
+			}
+			if (isAlternative()) {
+				return "ALT["+alternativesList+"|"+len+"]";
+			}
+			if (isSequence()) {
+				return "SEQ["+alternativesList+"|"+len+"]";
+			}
+			return "UNDEF";
 		}
 	}
 	
@@ -103,17 +131,36 @@ public class Y24Day21 {
 			}
 			currentPos = startPos;
 		}
-		public AlternativeStringBuilder type(String code) {
-			AlternativeStringBuilder asb = new AlternativeStringBuilder();
-			for (char c:code.toCharArray()) {
-//				result.append(" ["+c+"]");
-				asb.appendMinimal(navigateTo(c));
-				asb.append("A");
+		public AlternativeStringBuilder type(AlternativeStringBuilder codeAlternatives) {
+			AlternativeStringBuilder result = new AlternativeStringBuilder();
+			if (codeAlternatives.isValue()) {
+				return type(codeAlternatives.value);
 			}
-			return asb;
+			if (codeAlternatives.isAlternative()) {
+				Pos startPos = currentPos;
+				for (AlternativeStringBuilder codeSegment:codeAlternatives.alternativesList) {
+					currentPos = startPos;
+					AlternativeStringBuilder typedCodeSegment = type(codeSegment); 
+					result.addMinimal(typedCodeSegment);
+				}
+			}
+			if (codeAlternatives.isSequence()) {
+				for (AlternativeStringBuilder codeSegment:codeAlternatives.alternativesList) {
+					AlternativeStringBuilder typedCodeSegment = type(codeSegment); 
+					result.append(typedCodeSegment);
+				}
+			}
+			return result;
 		}
-		public List<String> navigateTo(char key) {
-			List<String> result = new ArrayList<>();
+		public AlternativeStringBuilder type(String code) {
+			AlternativeStringBuilder result = new AlternativeStringBuilder();
+			for (char c:code.toCharArray()) {
+				result.append(navigateTo(c));
+			}
+			return result;
+		}
+		public AlternativeStringBuilder navigateTo(char key) {
+			AlternativeStringBuilder result = null;
 			Pos targetPos = keyPositions.get(key);
 			int x = currentPos.x;
 			int y = currentPos.y;
@@ -143,7 +190,12 @@ public class Y24Day21 {
 				}
 			}
 			if (valid) {
-				result.add(way.toString());
+				way.append("A");
+				result = new AlternativeStringBuilder(way.toString());
+			}
+			if ((dx==0) || (dy==0)) {
+				currentPos = targetPos;
+				return result;
 			}
 			valid = true;
 			way.setLength(0);
@@ -162,7 +214,17 @@ public class Y24Day21 {
 				}
 			}
 			if (valid) {
-				result.add(way.toString());
+				way.append("A");
+				AlternativeStringBuilder result2 = new AlternativeStringBuilder(way.toString());
+				if (result == null) { 
+					result = result2;
+				}
+				else {
+					AlternativeStringBuilder result1 = result;
+					result = new AlternativeStringBuilder();
+					result.addMinimal(result1);
+					result.addMinimal(result2);
+				}
 			}
 			currentPos = targetPos;
 			return result;
@@ -192,28 +254,24 @@ public class Y24Day21 {
 			int result = 0;
 			for (String code:codes) {
 				System.out.println("--- "+code+" ---");
-				List<String> dirCodes = typeRobCodes(numRobs-1, code);
-				String dirCode = dirCodes.get(0);
-				System.out.println(code+": "+dirCode+" "+dirCode.length()+" ");
+				AlternativeStringBuilder dirCodes = typeRobCodes(numRobs-1, new AlternativeStringBuilder(code));
+				System.out.println(dirCodes);
+				int len = dirCodes.length();
+				System.out.println(code+": "+len+" ");
 				int codeNum = Integer.parseInt(code.replace("A", ""));
-				result = result + dirCode.length()*codeNum;
+				result = result + len*codeNum;
 			}
 			return result;
 		}
 
-		public List<String> typeRobCodes(int robNr, String code) {
+		public AlternativeStringBuilder typeRobCodes(int robNr, AlternativeStringBuilder codeAlternatives) {
 			if (robNr == 0) {
-				return robKeyPads[0].type(code).getAlternatives();
+				return robKeyPads[0].type(codeAlternatives);
 			}
 			else {
-				Set<String> alternatives = new LinkedHashSet<>();
-				List<String> childRobCodes = typeRobCodes(robNr-1, code);
-				for (String childRobCode:childRobCodes) {
-					alternatives.addAll(robKeyPads[robNr].type(childRobCode).getAlternatives());
-				}
-				AlternativeStringBuilder result = new AlternativeStringBuilder();
-				result.appendMinimal(alternatives);
-				return result.getAlternatives();
+				AlternativeStringBuilder childRobCodes = typeRobCodes(robNr-1, codeAlternatives);
+//				System.out.println(childRobCodes);
+				return robKeyPads[robNr].type(childRobCodes);
 			}
 		}
 		@Override
@@ -258,12 +316,14 @@ public class Y24Day21 {
 //		mainPart1("exchange/day21/feri/input-example.txt");
 //		mainPart1("exchange/day21/feri/input-example-1.txt");
 //		mainPart1("exchange/day21/feri/input-example-2.txt");
-		mainPart1("exchange/day21/feri/input.txt");     // < 244490   // < 241370
+//		mainPart1("exchange/day21/feri/input.txt");     // == 238078
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
 //		mainPart2("exchange/day21/feri/input-example.txt");
-		mainPart2("exchange/day21/feri/input.txt");    
+//		mainPart2("exchange/day21/feri/input-example-1.txt");
+		mainPart2("exchange/day21/feri/input-example-2.txt");
+//		mainPart2("exchange/day21/feri/input.txt");    
 		System.out.println("---------------");
 	}
 
