@@ -79,7 +79,9 @@ public class Y24Day22 {
 	
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
 		long sum2000 = 0;
-		Changes watch = new Changes(2,-1,1,0);
+//		Changes watch = new Changes(2,-1,1,0);
+		Changes watch = new Changes(-1,1,-1,2);
+		
 		Map<Changes, Integer> sumBestPrices = new HashMap<>();
 		try (Scanner scanner = new Scanner(new File(inputfile))) {
 			while (scanner.hasNext()) {
@@ -91,29 +93,30 @@ public class Y24Day22 {
 //				System.out.println("Secret: "+secret);
 				PriceChanges changes = new PriceChanges(secret%10, 0, 0, 0, 0);
 				long baseSecret = secret;
-				for (int i=0; i<3; i++) {
+				for (int i=1; i<=3; i++) {
 					secret = nextSecret(secret);
 					changes = changes.next(secret%10);
 //					System.out.println((i+1)+": "+secret+" "+changes);
 				}
 				Map<Changes, Integer> bestPrices = new HashMap<>();
-				for (int i=3; i<2000; i++) {
+				for (int i=4; i<=2000; i++) {
 					secret = nextSecret(secret);
 					changes = changes.next(secret%10);
 					updateBestPrice(bestPrices, changes);
-					if (changes.getChanges().equals(watch)) {
-						System.out.println("     WATCH "+changes+" ("+secret+" = "+baseSecret+" x "+(i+1)+")");
-					}
-//					System.out.println((i+1)+": "+secret+" "+changes);
+//					if (changes.getChanges().equals(watch)) {
+//						System.out.println("     WATCH "+changes+" ("+secret+" = "+baseSecret+" x "+i+")");
+////						showSequence(baseSecret, i-4, i);
+//					}
+////					System.out.println((i+1)+": "+secret+" "+changes);
 				}
 				sum2000 += secret;
 				Integer bp = bestPrices.get(watch);
 				for (Entry<Changes, Integer> entry:bestPrices.entrySet()) {
 					addBestPrice(sumBestPrices, entry.getKey(), entry.getValue());
 				}
-				if (bp != null) {
-					System.out.println("   FOUND "+bestPrices.get(watch)+"   "+watch+": + "+bestPrices.get(watch)+" = "+sumBestPrices.get(watch));
-				}
+//				if (bp != null) {
+//					System.out.println("   FOUND "+bestPrices.get(watch)+"   "+watch+": + "+bestPrices.get(watch)+" = "+sumBestPrices.get(watch));
+//				}
 				
 			}
 		}
@@ -126,12 +129,23 @@ public class Y24Day22 {
 			}
 		}
 		System.out.println("BEST CHANGE: "+bestChange+" value: "+bestChangeValue);
-		System.out.println("SUM2000: "+sum2000);
 	}
 	
+	private static void showSequence(long startSecret, int from, int to) {
+		System.out.println("       "+startSecret);
+		long secret = startSecret;
+		for (int i=1; i<=to; i++) {
+			secret = nextSecret(secret);
+			if (i>=from) {
+				System.out.println("       x "+i+" = "+secret);
+			}
+		}
+			
+	}
+
 	private static void updateBestPrice(Map<Changes, Integer> bestPrices, PriceChanges changes) {
 		Integer bp = bestPrices.get(changes.getChanges());
-		if (bp==null || (bp<changes.value)) {
+		if (bp==null) { //  || (bp<changes.value)) {
 			bestPrices.put(changes.getChanges(), (int)changes.value);
 		}
 	}
@@ -156,7 +170,8 @@ public class Y24Day22 {
 //		mainPart2("exchange/day22/feri/input-example.txt");
 //		mainPart2("exchange/day22/feri/input-example-2.txt");
 //		mainPart2("exchange/day22/feri/input-example-3.txt");
-		mainPart2("exchange/day22/feri/input.txt");     // < 1641 (2,-1,1,0)
+//		mainPart2("exchange/day22/feri/input-patrick.txt");     
+		mainPart2("exchange/day22/feri/input.txt");     //
 		System.out.println("---------------");
 	}
 
