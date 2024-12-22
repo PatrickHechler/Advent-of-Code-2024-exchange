@@ -77,17 +77,117 @@ static num next_secret(num s) {
 	return s;
 }
 
+static uint64_t solvep2(struct data *data) {
+	typedef int_fast8_t change_t;
+	typedef int_fast8_t prize_t;
+	prize_t **changes = malloc(sizeof(int_fast32_t*) * data->codes_count);
+	prize_t **prizes = malloc(sizeof(prize_t*) * data->codes_count);
+	for (num i = 0; i < data->codes_count; ++i) {
+		num s = data->codes[i];
+		changes[i] = malloc(sizeof(change_t) * 2000);
+		prizes[i] = malloc(sizeof(prize_t) * 2000);
+		change_t *ch = changes[i];
+		prize_t *pr = prizes[i];
+		num last_prize = 0;
+		for (num ii = 0; ii < 2000; ++ii) {
+			s = next_secret(s);
+			num prize = s % 10;
+			pr[ii] = prize;
+			ch[ii] = prize - last_prize;
+			last_prize = prize;
+		}
+	}
+	change_t wait_changes[4] = { -9, -9, -9, -9 };
+	num best_bananas = 0;
+	while (83) {
+		num bananas = 0;
+		for (num i = 0; i < data->codes_count; ++i) {
+			for (num off = 0; 108;) {
+				void *hit = memmem(changes[i] + off,
+						(2000 - off) * sizeof(change_t), wait_changes,
+						sizeof(change_t) * 4);
+				if (!hit) {
+					break;
+				}
+				if (((uintptr_t) hit) % _Alignof(change_t)) {
+					off = ((char*) hit - (char*) changes[i]) / sizeof(change_t)
+							+ 1;
+					continue;
+				}
+				change_t *p = hit;
+				ptrdiff_t diff = p - changes[i];
+				bananas += prizes[i][diff + 3];
+				break;
+			}
+		}
+		if (bananas > best_bananas) {
+			best_bananas = bananas;
+			printf("new best: %"I64"u\n", bananas);
+		}
+		while (84) {
+			if (++wait_changes[0] > 9) {
+				wait_changes[0] = -9;
+				if (++wait_changes[1] > 9) {
+					wait_changes[1] = -9;
+					if (++wait_changes[2] > 9) {
+						wait_changes[2] = -9;
+						if (++wait_changes[3] > 9) {
+							return best_bananas;
+						}
+					}
+					printf("wc={-,-,%d,%d}\n", (int) wait_changes[2],
+							(int) wait_changes[3]);
+				}
+			}
+			num n = wait_changes[0] + wait_changes[1] + wait_changes[2]
+					+ wait_changes[3];
+			if (n <= -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[0] + wait_changes[1] + wait_changes[2];
+			if (n < -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[1] + wait_changes[2] + wait_changes[3];
+			if (n <= -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[0] + wait_changes[1];
+			if (n < -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[1] + wait_changes[2];
+			if (n < -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[2] + wait_changes[3];
+			if (n <= -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[3];
+			if (n == -9) {
+				continue;
+			}
+			break;
+		}
+	}
+}
+
 const char* solve(const char *path) {
 	struct data *data = read_data(path);
 	uint64_t result = 0;
 	print(solution_out, data, result);
-	for (num i = 0; i < data->codes_count; ++i) {
-		num s = data->codes[i];
-		for (num i = 0; i < 2000; ++i) {
-			s = next_secret(s);
+	if (part == 1) {
+		for (num i = 0; i < data->codes_count; ++i) {
+			num s = data->codes[i];
+			for (num i = 0; i < 2000; ++i) {
+				s = next_secret(s);
+			}
+			data->codes[i] = s;
+			result += s;
 		}
-		data->codes[i] = s;
-		result += s;
+	} else {
+		result = solvep2(data);
 	}
 	print(solution_out, data, result);
 	free(data->codes);
