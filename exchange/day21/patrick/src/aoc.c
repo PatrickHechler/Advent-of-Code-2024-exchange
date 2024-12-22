@@ -26,7 +26,7 @@
 
 struct data* read_data(const char *path);
 
-int day = 19;
+int day = 21;
 int part = 2;
 FILE *solution_out;
 #ifdef INTERACTIVE
@@ -70,6 +70,7 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 struct result {
 	char *str;
 	uint64_t above_count;
+	clock_t time;
 	uint64_t result;
 };
 
@@ -92,13 +93,15 @@ static void r_free(void *a) {
 	free(a);
 }
 
-static uint64_t calc_sortest(char *code, size_t above_count,
+static struct result* calc_sortest(char *code, size_t above_count,
 		struct hashset *cache) {
 	struct result r0 = { .str = code, .above_count = above_count };
 	struct result *r = hs_get(cache, &r0);
 	if (r) {
-		return r->result;
+		return r;
 	}
+	clock_t start = clock();
+	clock_t add = 0;
 	r = malloc(sizeof(struct result));
 	r->str = strdup(code);
 	r->above_count = above_count;
@@ -177,7 +180,12 @@ static uint64_t calc_sortest(char *code, size_t above_count,
 					memset(buf + adx, myc, ady);
 					buf[len] = 'A';
 					buf[len + 1] = 0;
-					len = calc_sortest(buf, above_count - 1, cache);
+					add += clock() - start;
+					struct result *r = calc_sortest(buf, above_count - 1,
+							cache);
+					start = clock();
+					add += r->time;
+					len = r->result;
 				} else {
 					++len;
 				}
@@ -198,7 +206,12 @@ static uint64_t calc_sortest(char *code, size_t above_count,
 				memset(buf + adx, myc, ady);
 				buf[len] = 'A';
 				buf[len + 1] = 0;
-				len = calc_sortest(buf, above_count - 1, cache);
+				add += clock() - start;
+				struct result *r = calc_sortest(buf, above_count - 1,
+						cache);
+				start = clock();
+				add += r->time;
+				len = r->result;
 			} else {
 				++len;
 			}
@@ -223,19 +236,27 @@ static uint64_t calc_sortest(char *code, size_t above_count,
 				memset(buf + ady, mxc, adx);
 				buf[len] = 'A';
 				buf[len + 1] = 0;
-				len = calc_sortest(buf, above_count - 1, cache);
+				add += clock() - start;
+				struct result *r = calc_sortest(buf, above_count - 1,
+						cache);
+				start = clock();
+				add += r->time;
+				len = r->result;
 			} else {
 				++len;
 			}
-			if (len < min_add)
+			if (len < min_add) {
 				min_add = len;
+			}
 		}
 		result += min_add;
 		bot = dst;
 	}
 	r->result = result;
+	r->time = clock() - start;
+	r->time += add;
 	hs_set(cache, r);
-	return result;
+	return r;
 }
 
 const char* solve(const char *path) {
@@ -251,10 +272,16 @@ const char* solve(const char *path) {
 			fprintf(stderr, "invalid code %s\n", code);
 			exit(2);
 		}
-		uint64_t len = calc_sortest(code, part == 1 ? 3 : 26, &hs);
+		struct result *r = calc_sortest(code, part == 1 ? 3 : 26, &hs);
+		uint64_t len = r->result;
+		uint64_t time = r->time;
 		printf("the code is %s\n"
-				"the add result %"I64"u = %"I64"u * %"I64"u\n", code, len * val,
-				len, val);
+				"the add result %"I64"u = %"I64"u * %"I64"u\n"
+				"  I needed: %"I64"u.%6"I64"us\n", code, len * val,
+				len, val,
+				time / CLOCKS_PER_SEC,
+				((time % CLOCKS_PER_SEC) * UINT64_C(1000000)) / CLOCKS_PER_SEC
+			);
 		result += len * val;
 	}
 	free(data->codes);
