@@ -26,7 +26,7 @@
 
 struct data* read_data(const char *path);
 
-int day = 21;
+int day = 22;
 int part = 2;
 FILE *solution_out;
 #ifdef INTERACTIVE
@@ -45,7 +45,7 @@ struct pos {
 };
 
 struct data {
-	char **codes;
+	num *codes;
 	num codes_count;
 	size_t max_codes_count;
 };
@@ -62,228 +62,134 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 		return;
 	}
 	for (num y = 0; y < data->codes_count; ++y) {
-		fprintf(str, "%s\n", data->codes[y]);
+		fprintf(str, "%"I64"u\n", data->codes[y]);
 	}
 	fputs(interactive ? STEP_FINISHED : RESET, str);
 }
 
-struct result {
-	char *str;
-	uint64_t above_count;
-	clock_t time;
-	uint64_t result;
-};
-
-static uint64_t r_h(const void *a) {
-	const struct result *r = a;
-	uint64_t result = r->above_count;
-	for (const char *c = r->str; *c; ++c) {
-		result = result * 31 + *c;
-	}
-	return result;
+static num next_secret(num s) {
+	s ^= s * 64;
+	s %= 16777216;
+	s ^= s / 32;
+	s %= 16777216;
+	s ^= s * 2048;
+	s %= 16777216;
+	return s;
 }
 
-static int r_eq(const void *a, const void *b) {
-	const struct result *r0 = a, *r1 = b;
-	return r0->above_count == r1->above_count && !strcmp(r0->str, r1->str);
-}
-
-static void r_free(void *a) {
-	free(((struct result*) a)->str);
-	free(a);
-}
-
-static struct result* calc_sortest(char *code, size_t above_count,
-		struct hashset *cache) {
-	struct result r0 = { .str = code, .above_count = above_count };
-	struct result *r = hs_get(cache, &r0);
-	if (r) {
-		return r;
-	}
-	clock_t start = clock();
-	clock_t add = 0;
-	r = malloc(sizeof(struct result));
-	r->str = strdup(code);
-	r->above_count = above_count;
-	struct pos A = { 2, (*code >= '0' && *code <= '9') ? 3 : 0 };
-	struct pos hole = { 0, A.y };
-	struct pos bot = A;
-	uint64_t result = 0;
-	for (; *code; ++code) {
-		struct pos dst;
-		switch (*code) {
-		case 'A':
-			dst = A;
-			break;
-		case '7':
-			dst.x = 0;
-			dst.y = 0;
-			break;
-		case '^':
-		case '8':
-			dst.x = 1;
-			dst.y = 0;
-			break;
-		case '9':
-			dst.x = 2;
-			dst.y = 0;
-			break;
-		case '<':
-		case '4':
-			dst.x = 0;
-			dst.y = 1;
-			break;
-		case 'v':
-		case '5':
-			dst.x = 1;
-			dst.y = 1;
-			break;
-		case '>':
-		case '6':
-			dst.x = 2;
-			dst.y = 1;
-			break;
-		case '1':
-			dst.x = 0;
-			dst.y = 2;
-			break;
-		case '2':
-			dst.x = 1;
-			dst.y = 2;
-			break;
-		case '3':
-			dst.x = 2;
-			dst.y = 2;
-			break;
-		case '0':
-			dst.x = 1;
-			dst.y = 3;
-			break;
-		default:
-			exit(4);
+static uint64_t solvep2(struct data *data) {
+	typedef int_fast8_t change_t;
+	typedef int_fast8_t prize_t;
+	prize_t **changes = malloc(sizeof(int_fast32_t*) * data->codes_count);
+	prize_t **prizes = malloc(sizeof(prize_t*) * data->codes_count);
+	for (num i = 0; i < data->codes_count; ++i) {
+		num s = data->codes[i];
+		changes[i] = malloc(sizeof(change_t) * 2000);
+		prizes[i] = malloc(sizeof(prize_t) * 2000);
+		change_t *ch = changes[i];
+		prize_t *pr = prizes[i];
+		num last_prize = 0;
+		for (num ii = 0; ii < 2000; ++ii) {
+			s = next_secret(s);
+			num prize = s % 10;
+			pr[ii] = prize;
+			ch[ii] = prize - last_prize;
+			last_prize = prize;
 		}
-		uint64_t min_add = UINT64_MAX;
-		num dx = dst.x - bot.x;
-		num dy = dst.y - bot.y;
-		if (dx < 0) {
-			if (dst.x || (hole.y != dst.y && hole.y != bot.y)) {
-				char myc = 'v';
-				num ady = dy, adx = -dx;
-				if (dy < 0) {
-					myc = '^';
-					ady = -dy;
+	}
+	change_t wait_changes[4] = { -9, -9, -9, -9 };
+	num best_bananas = 0;
+	while (83) {
+		num bananas = 0;
+		for (num i = 0; i < data->codes_count; ++i) {
+			for (num off = 0; 108;) {
+				void *hit = memmem(changes[i] + off,
+						(2000 - off) * sizeof(change_t), wait_changes,
+						sizeof(change_t) * 4);
+				if (!hit) {
+					break;
 				}
-				size_t len = ady + adx;
-				if (above_count > 1) {
-					char buf[len + 2];
-					memset(buf, '<', adx);
-					memset(buf + adx, myc, ady);
-					buf[len] = 'A';
-					buf[len + 1] = 0;
-					add += clock() - start;
-					struct result *r = calc_sortest(buf, above_count - 1,
-							cache);
-					start = clock();
-					add += r->time;
-					len = r->result;
-				} else {
-					++len;
+				if (((uintptr_t) hit) % _Alignof(change_t)) {
+					off = ((char*) hit - (char*) changes[i]) / sizeof(change_t)
+							+ 1;
+					continue;
 				}
-				if (len < min_add)
-					min_add = len;
-			}
-		} else {
-			char myc = 'v';
-			num ady = dy, adx = dx;
-			if (dy < 0) {
-				myc = '^';
-				ady = -dy;
-			}
-			size_t len = ady + adx;
-			if (above_count > 1) {
-				char buf[len + 2];
-				memset(buf, '>', adx);
-				memset(buf + adx, myc, ady);
-				buf[len] = 'A';
-				buf[len + 1] = 0;
-				add += clock() - start;
-				struct result *r = calc_sortest(buf, above_count - 1,
-						cache);
-				start = clock();
-				add += r->time;
-				len = r->result;
-			} else {
-				++len;
-			}
-			if (len < min_add)
-				min_add = len;
-		}
-		if ((bot.x || dst.y != hole.y)) {
-			char myc = 'v', mxc = '>';
-			num ady = dy, adx = dx;
-			if (dy < 0) {
-				myc = '^';
-				ady = -dy;
-			}
-			if (dx < 0) {
-				mxc = '<';
-				adx = -dx;
-			}
-			size_t len = ady + adx;
-			if (above_count > 1) {
-				char buf[len + 2];
-				memset(buf, myc, ady);
-				memset(buf + ady, mxc, adx);
-				buf[len] = 'A';
-				buf[len + 1] = 0;
-				add += clock() - start;
-				struct result *r = calc_sortest(buf, above_count - 1,
-						cache);
-				start = clock();
-				add += r->time;
-				len = r->result;
-			} else {
-				++len;
-			}
-			if (len < min_add) {
-				min_add = len;
+				change_t *p = hit;
+				ptrdiff_t diff = p - changes[i];
+				bananas += prizes[i][diff + 3];
+				break;
 			}
 		}
-		result += min_add;
-		bot = dst;
+		if (bananas > best_bananas) {
+			best_bananas = bananas;
+			printf("new best: %"I64"u\n", bananas);
+		}
+		while (84) {
+			if (++wait_changes[0] > 9) {
+				wait_changes[0] = -9;
+				if (++wait_changes[1] > 9) {
+					wait_changes[1] = -9;
+					if (++wait_changes[2] > 9) {
+						wait_changes[2] = -9;
+						if (++wait_changes[3] > 9) {
+							return best_bananas;
+						}
+					}
+					printf("wc={-,-,%d,%d}\n", (int) wait_changes[2],
+							(int) wait_changes[3]);
+				}
+			}
+			num n = wait_changes[0] + wait_changes[1] + wait_changes[2]
+					+ wait_changes[3];
+			if (n <= -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[0] + wait_changes[1] + wait_changes[2];
+			if (n < -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[1] + wait_changes[2] + wait_changes[3];
+			if (n <= -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[0] + wait_changes[1];
+			if (n < -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[1] + wait_changes[2];
+			if (n < -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[2] + wait_changes[3];
+			if (n <= -9 || n > 9) {
+				continue;
+			}
+			n = wait_changes[3];
+			if (n == -9) {
+				continue;
+			}
+			break;
+		}
 	}
-	r->result = result;
-	r->time = clock() - start;
-	r->time += add;
-	hs_set(cache, r);
-	return r;
 }
 
 const char* solve(const char *path) {
 	struct data *data = read_data(path);
 	uint64_t result = 0;
 	print(solution_out, data, result);
-	struct hashset hs = { .hash = r_h, .equal = r_eq, .free = r_free };
-	for (int i = 0; i < data->codes_count; ++i) {
-		char *code = data->codes[i];
-		char *end;
-		uint64_t val = strtol(code, &end, 10);
-		if (errno || end[0] != 'A' || end[1]) {
-			fprintf(stderr, "invalid code %s\n", code);
-			exit(2);
+	if (part == 1) {
+		for (num i = 0; i < data->codes_count; ++i) {
+			num s = data->codes[i];
+			for (num i = 0; i < 2000; ++i) {
+				s = next_secret(s);
+			}
+			data->codes[i] = s;
+			result += s;
 		}
-		struct result *r = calc_sortest(code, part == 1 ? 3 : 26, &hs);
-		uint64_t len = r->result;
-		uint64_t time = r->time;
-		printf("the code is %s\n"
-				"the add result %"I64"u = %"I64"u * %"I64"u\n"
-				"  I needed: %"I64"u.%6"I64"us\n", code, len * val,
-				len, val,
-				time / CLOCKS_PER_SEC,
-				((time % CLOCKS_PER_SEC) * UINT64_C(1000000)) / CLOCKS_PER_SEC
-			);
-		result += len * val;
+	} else {
+		result = solvep2(data);
 	}
+	print(solution_out, data, result);
 	free(data->codes);
 	free(data);
 	return u64toa(result);
@@ -301,15 +207,18 @@ static struct data* parse_line(struct data *data, char *line) {
 		data->codes_count = 0;
 		data->max_codes_count = 16;
 	}
-	char *end = line + strlen(line);
-	while (isspace(*--end))
-		;
-	*++end = '\0';
 	if (++data->codes_count > data->max_codes_count) {
 		data->codes = reallocarray(data->codes, data->max_codes_count <<= 1,
 				sizeof(char*));
 	}
-	data->codes[data->codes_count - 1] = strdup(line);
+	char *end;
+	data->codes[data->codes_count - 1] = strtol(line, &end, 10);
+	while (*end && isspace(*end))
+		++end;
+	if (*end) {
+		fprintf(stderr, "invalid line: %s", line);
+		exit(1);
+	}
 	return data;
 }
 
