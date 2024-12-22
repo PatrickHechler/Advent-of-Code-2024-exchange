@@ -78,11 +78,9 @@ public class Y24Day22 {
 	}
 	
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
-		long sum2000 = 0;
 //		Changes watch = new Changes(2,-1,1,0);
-		Changes watch = new Changes(-1,1,-1,2);
 		
-		Map<Changes, Integer> sumBestPrices = new HashMap<>();
+		Map<Changes, Integer> sumFirstPrices = new HashMap<>();
 		try (Scanner scanner = new Scanner(new File(inputfile))) {
 			while (scanner.hasNext()) {
 				String line = scanner.nextLine().trim();
@@ -98,22 +96,21 @@ public class Y24Day22 {
 					changes = changes.next(secret%10);
 //					System.out.println((i+1)+": "+secret+" "+changes);
 				}
-				Map<Changes, Integer> bestPrices = new HashMap<>();
+				Map<Changes, Integer> firstPrices = new HashMap<>();
 				for (int i=4; i<=2000; i++) {
 					secret = nextSecret(secret);
 					changes = changes.next(secret%10);
-					updateBestPrice(bestPrices, changes);
+					firstPrices.putIfAbsent(changes.getChanges(), (int)changes.value);
 //					if (changes.getChanges().equals(watch)) {
 //						System.out.println("     WATCH "+changes+" ("+secret+" = "+baseSecret+" x "+i+")");
 ////						showSequence(baseSecret, i-4, i);
 //					}
 ////					System.out.println((i+1)+": "+secret+" "+changes);
 				}
-				sum2000 += secret;
-				Integer bp = bestPrices.get(watch);
-				for (Entry<Changes, Integer> entry:bestPrices.entrySet()) {
-					addBestPrice(sumBestPrices, entry.getKey(), entry.getValue());
+				for (Entry<Changes, Integer> entry:firstPrices.entrySet()) {
+					addFirstPrice(sumFirstPrices, entry.getKey(), entry.getValue());
 				}
+//				Integer bp = firstPrices.get(watch);
 //				if (bp != null) {
 //					System.out.println("   FOUND "+bestPrices.get(watch)+"   "+watch+": + "+bestPrices.get(watch)+" = "+sumBestPrices.get(watch));
 //				}
@@ -122,7 +119,7 @@ public class Y24Day22 {
 		}
 		int bestChangeValue = -1;
 		Changes bestChange = null;
-		for (Entry<Changes, Integer> entry:sumBestPrices.entrySet()) {
+		for (Entry<Changes, Integer> entry:sumFirstPrices.entrySet()) {
 			if (entry.getValue()>bestChangeValue) {
 				bestChangeValue = entry.getValue();
 				bestChange = entry.getKey();
@@ -143,19 +140,12 @@ public class Y24Day22 {
 			
 	}
 
-	private static void updateBestPrice(Map<Changes, Integer> bestPrices, PriceChanges changes) {
-		Integer bp = bestPrices.get(changes.getChanges());
-		if (bp==null) { //  || (bp<changes.value)) {
-			bestPrices.put(changes.getChanges(), (int)changes.value);
-		}
-	}
-
-	private static void addBestPrice(Map<Changes, Integer> sumBestPrices, Changes changes, int bestValue) {
-		Integer sbp = sumBestPrices.get(changes);
+	private static void addFirstPrice(Map<Changes, Integer> sumFirstPrices, Changes changes, int firstValue) {
+		Integer sbp = sumFirstPrices.get(changes);
 		if (sbp==null) {
 			sbp = 0;
 		}
-		sumBestPrices.put(changes, sbp+bestValue);
+		sumFirstPrices.put(changes, sbp+firstValue);
 	}
 
 
