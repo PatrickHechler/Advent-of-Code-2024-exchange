@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -25,17 +26,17 @@ public class Y24Day22 {
 					break;
 				}
 				long secret = Long.parseLong(line);
-				System.out.println("Secret: "+secret);
-				System.out.println("  next: "+nextSecret(secret));
+//				System.out.println("Secret: "+secret);
+//				System.out.println("  next: "+nextSecret(secret));
 				for (int i=0; i<10; i++) {
 					secret = nextSecret(secret);
-					System.out.println("    "+(i+1)+":"+secret);
+//					System.out.println("    "+(i+1)+":"+secret);
 				}
 				for (int i=0; i<2000-10; i++) {
 					secret = nextSecret(secret);
 				}
 				sum2000 += secret;
-				System.out.println("  2000: "+secret);
+//				System.out.println("  2000: "+secret);
 			}
 			System.out.println("SUMME 2000: "+sum2000);
 		}
@@ -54,9 +55,81 @@ public class Y24Day22 {
 		return secret;
 	}
 
-	public static void mainPart2(String inputfile) throws FileNotFoundException {
+	
+	record Changes(int c1, int c2, int c3, int c4) {
+		@Override
+		public String toString() {
+			return "("+c4+","+c3+","+c2+","+c1+")";
+		}
+
 	}
 	
+	record PriceChanges(long value, int c1, int c2, int c3, int c4) {
+		public PriceChanges next(long newValue) {
+			return new PriceChanges(newValue, (int)(newValue-value), c1, c2, c3); 
+		}
+		public Changes getChanges() {
+			return new Changes(c1, c2, c3, c4);
+		}
+		@Override
+		public String toString() {
+			return "("+value+"|"+c4+","+c3+","+c2+","+c1+")";
+		}
+	}
+	
+	public static void mainPart2(String inputfile) throws FileNotFoundException {
+		Map<Changes, Integer> sumBestPrices = new HashMap<>();
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line = scanner.nextLine().trim();
+				if (line.isBlank()) {
+					break;
+				}
+				long secret = Long.parseLong(line);
+				System.out.println("Secret: "+secret);
+				PriceChanges changes = new PriceChanges(secret%10, 0, 0, 0, 0);
+				for (int i=0; i<3; i++) {
+					secret = nextSecret(secret);
+					changes = changes.next(secret%10);
+				}
+				Map<Changes, Integer> bestPrices = new HashMap<>();
+				for (int i=0; i<2000-3; i++) {
+					secret = nextSecret(secret);
+					changes = changes.next(secret%10);
+					updateBestPrice(bestPrices, changes);
+				}
+				for (Entry<Changes, Integer> entry:bestPrices.entrySet()) {
+					addBestPrice(sumBestPrices, entry.getKey(), entry.getValue());
+				}
+			}
+		}
+		int bestChangeValue = -1;
+		Changes bestChange = null;
+		for (Entry<Changes, Integer> entry:sumBestPrices.entrySet()) {
+			if (entry.getValue()>bestChangeValue) {
+				bestChangeValue = entry.getValue();
+				bestChange = entry.getKey();
+			}
+		}
+		System.out.println("BEST CHANGE: "+bestChange+" value: "+bestChangeValue);
+	}
+	
+	private static void updateBestPrice(Map<Changes, Integer> bestPrices, PriceChanges changes) {
+		Integer bp = bestPrices.get(changes.getChanges());
+		if (bp==null || (bp<changes.value)) {
+			bestPrices.put(changes.getChanges(), (int)changes.value);
+		}
+	}
+
+	private static void addBestPrice(Map<Changes, Integer> sumBestPrices, Changes changes, int bestValue) {
+		Integer sbp = sumBestPrices.get(changes);
+		if (sbp==null) {
+			sbp = 0;
+		}
+		sumBestPrices.put(changes, sbp+bestValue);
+	}
+
+
 	public static void main(String[] args) throws FileNotFoundException {
 		System.out.println("--- PART I  ---");
 //		mainPart1("exchange/day22/feri/input-example.txt");
@@ -65,8 +138,10 @@ public class Y24Day22 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day22/feri/input-example.txt");
-//		mainPart2("exchange/day22/feri/input.txt");
+//		mainPart2("exchange/day22/feri/input-example.txt");
+//		mainPart2("exchange/day22/feri/input-example-2.txt");
+		mainPart2("exchange/day22/feri/input-example-3.txt");
+//		mainPart2("exchange/day22/feri/input.txt");     // < 1641 (2,-1,1,0)
 		System.out.println("---------------");
 	}
 
