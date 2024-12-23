@@ -1,8 +1,11 @@
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
@@ -36,7 +39,6 @@ public class Y24Day23 {
 					break;
 				}
 				String[] computers = line.split("-");
-				System.out.println(computers[0] + " -- " + computers[1]);
 				connections.computeIfAbsent(computers[0], (k)->new LinkedHashSet<>()).add(computers[1]);
 				connections.computeIfAbsent(computers[1], (k)->new LinkedHashSet<>()).add(computers[0]);
 			}
@@ -59,6 +61,59 @@ public class Y24Day23 {
 
 	
 	public static void mainPart2(String inputfile) throws FileNotFoundException {
+
+		Map<String, Set<String>> connections = new HashMap<>();
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line = scanner.nextLine().trim();
+				if (line.isBlank()) {
+					break;
+				}
+				String[] computers = line.split("-");
+				connections.computeIfAbsent(computers[0], (k)->new LinkedHashSet<>()).add(computers[1]);
+				connections.computeIfAbsent(computers[1], (k)->new LinkedHashSet<>()).add(computers[0]);
+			}
+			Set<Set<String>> clusters = new LinkedHashSet<>();
+			for (String computer:connections.keySet()) {
+				Set<String> cluster = new LinkedHashSet<>();
+				cluster.add(computer);
+				clusters.add(cluster);
+			}
+			for (int i=2; i<=connections.keySet().size(); i++) {
+				Set<Set<String>> nextClusters = new LinkedHashSet<>();
+				for (Set<String> cluster:clusters) {
+					for (String newComputer:connections.keySet()) {
+						if (cluster.contains(newComputer)) {
+							continue;
+						}
+						Set<String> newComputerConnections = connections.get(newComputer);
+						boolean fullyConnected = true;
+						for (String clusterComputer:cluster) {
+							if (!newComputerConnections.contains(clusterComputer)) {
+								fullyConnected=false;
+								break;
+							}
+						}
+						if (fullyConnected) {
+							Set<String> nextCluster = new LinkedHashSet<>(cluster);
+							nextCluster.add(newComputer);
+							nextClusters.add(nextCluster);
+						}
+					}
+				}
+				System.out.println("  Fully connected Networks of size "+i+": "+nextClusters.size());
+				if (nextClusters.size() == 0) {
+					System.out.println("FOUND "+clusters.size()+" cluster with max size "+(i-1));
+					Set<String> maxCluster = clusters.iterator().next();
+					List<String> sortedComputers = new ArrayList<>(maxCluster);
+					Collections.sort(sortedComputers);
+					System.out.println("MAX NETWORK CLUSTER: "+sortedComputers.toString().replace(" ", "").replace("[", "").replace("]", ""));
+					break;
+				}
+				clusters = nextClusters;
+			}
+//			System.out.println(t3Nets);
+		}
 	}
 	
 
@@ -70,8 +125,10 @@ public class Y24Day23 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-		mainPart2("exchange/day23/feri/input-example.txt");
-//		mainPart2("exchange/day23/feri/input.txt");     
+		StopWatch22.run("Day 23 Part 2", () -> {
+//			mainPart2("exchange/day23/feri/input-example.txt");
+			mainPart2("exchange/day23/feri/input.txt");
+		});
 		System.out.println("---------------");
 	}
 
