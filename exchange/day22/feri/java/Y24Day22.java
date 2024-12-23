@@ -157,11 +157,13 @@ public class Y24Day22 {
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
-//		mainPart2("exchange/day22/feri/input-example.txt");
-//		mainPart2("exchange/day22/feri/input-example-2.txt");
-//		mainPart2("exchange/day22/feri/input-example-3.txt");
-//		mainPart2("exchange/day22/feri/input-patrick.txt");     
-		mainPart2("exchange/day22/feri/input.txt");     //
+		StopWatch22.run("Day 22 Part 2", () -> {
+//			mainPart2("exchange/day22/feri/input-example.txt");
+//			mainPart2("exchange/day22/feri/input-example-2.txt");
+//			mainPart2("exchange/day22/feri/input-example-3.txt");
+//			mainPart2("exchange/day22/feri/input-patrick.txt");     
+			mainPart2("exchange/day22/feri/input.txt");     //
+		});
 		System.out.println("---------------");
 	}
 

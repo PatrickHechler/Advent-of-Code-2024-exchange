@@ -73,7 +73,7 @@ public class Y24Day17 {
 			case OUT:
 				out(combo(arg), debug);
 				if (OUT.length()>100) {
-					return false;
+					throw new RuntimeException("endlosschleife?");
 				}
 				break;
 			case BDV:
