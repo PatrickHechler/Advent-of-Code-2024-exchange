@@ -1,2 +1,2 @@
 p1: 1064
-p2: 
+p2: aq,cc,ea,gc,jo,od,pa,rg,rv,ub,ul,vr,yy

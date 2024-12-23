@@ -226,15 +226,191 @@ static int v_calc_result(void *param, void *element) {
 	return 0;
 }
 
+static int v_h(void *param, void *element) {
+	uint64_t *arg = param;
+	struct computer *com = element;
+	*arg += c_h(com);
+	return 0;
+}
+
+static uint64_t h_h(const void *a) {
+	struct hashset *hs = (void*) a;
+	uint64_t result = 1;
+	hs_for_each(hs, &result, v_h);
+	return result;
+}
+
+static int v_eq(void *param, void *element) {
+	struct hashset *ohs = param;
+	if (!hs_get(ohs, element)) {
+		return 1;
+	}
+	return 0;
+}
+static int h_eq(const void *a, const void *b) {
+	struct hashset *hs0 = (void*) a, *hs1 = (void*) b;
+	if (hs0->entry_count != hs1->entry_count) {
+		return 0;
+	}
+	if (hs_for_each(hs0, hs1, v_eq)) {
+		return 0;
+	}
+	return 1;
+}
+static void h_free(void *element) {
+	hs_clear(element);
+	free(element);
+}
+static void* h_compute(void *param, void *old_element, void *new_element) {
+	if (old_element) {
+		hs_clear(new_element);
+		return old_element;
+	}
+	struct hashset *result = malloc(sizeof(struct hashset));
+	*result = *(struct hashset*) new_element;
+	return result;
+}
+
+static int v_init_all_groups(void *param, void *element) {
+	struct hashset *arg = param;
+	struct computer *com = element;
+	struct hashset hs = { .equal = c_eq, .hash = c_h };
+	hs_set(&hs, com);
+	hs_compute(arg, &hs, 0, h_compute);
+	return 0;
+}
+
+static int v_hs_set(void *param, void *element) {
+	struct hashset *arg = param;
+	hs_set(arg, element);
+	return 0;
+}
+
+static int v_check_contains_all(void *param, void *element) {
+	struct hashset *arg = param;
+	struct computer *com = element;
+	if (!hs_get(arg, com)) {
+		return 1;
+	}
+	return 0;
+}
+struct caag_arg {
+	struct hashset *all;
+	struct hashset *add;
+	struct hashset *cur;
+	struct computer *com;
+};
+static int v_check_and_add_groups(void *param, void *element) {
+	struct caag_arg *arg = param;
+	struct computer *com = element;
+	if (hs_get(arg->cur, com)) {
+		return 0;
+	}
+	if (hs_for_each(arg->cur, &com->connected, v_check_contains_all)) {
+		return 0;
+	}
+	struct hashset new = { .equal = c_eq, .hash = c_h };
+	hs_for_each(arg->cur, &new, v_hs_set);
+	hs_add(&new, com);
+	if (hs_get(arg->all, &new)) {
+		hs_clear(&new);
+		return 0;
+	}
+	hs_compute(arg->add, &new, 0, h_compute);
+	return 0;
+}
+
+struct fag_arg {
+	struct hashset *all;
+	struct hashset *add;
+	struct hashset *cur;
+};
+static int v_find_add_groups(void *param, void *element) {
+	struct fag_arg *arg = param;
+	struct computer *com = element;
+	struct caag_arg caarg = { arg->all, arg->add, arg->cur, com };
+	hs_for_each(&com->connected, &caarg, v_check_and_add_groups);
+	return 0;
+}
+
+struct cag_arg {
+	struct hashset *all;
+	struct hashset *add;
+};
+static int v_calc_add_groups(void *param, void *element) {
+	struct cag_arg *arg = param;
+	struct hashset *group = element;
+	struct fag_arg farg = { arg->all, arg->add, group };
+	hs_for_each(group, &farg, v_find_add_groups);
+	return 0;
+}
+
+static int v_find_max_group(void *param, void *element) {
+	struct hashset **max = param;
+	struct hashset *cur = element;
+	if ((*max)->entry_count < cur->entry_count) {
+		*max = cur;
+	}
+	return 0;
+}
+
+struct g_arg {
+	struct computer **list;
+	off_t off;
+};
+static int v_gather(void *param, void *element) {
+	struct g_arg *arg = param;
+	arg->list[arg->off++] = element;
+	return 0;
+}
+
+static int c_com(const void *a, const void *b) {
+	const struct computer *const*c0 = a, *const*c1 = b;
+	return strcmp((*c0)->name, (*c1)->name);
+}
+
 const char* solve(const char *path) {
 	struct data *data = read_data(path);
 	uint64_t result = 0;
-	struct cr_arg arg = { { .equal = tc_eq, .hash = tc_h, .free = free }, data };
-	print(solution_out, data, &arg.tcs, result);
-	hs_for_each(&data->comps, &arg, v_calc_result);
-	result = arg.tcs.entry_count;
-	print(solution_out, data, &arg.tcs, result);
-	hs_clear(&arg.tcs);
+	if (part == 1) {
+		struct cr_arg arg = { { .equal = tc_eq, .hash = tc_h, .free = free },
+				data };
+		print(solution_out, data, &arg.tcs, result);
+		hs_for_each(&data->comps, &arg, v_calc_result);
+		result = arg.tcs.entry_count;
+		print(solution_out, data, &arg.tcs, result);
+		hs_clear(&arg.tcs);
+	} else {
+		struct hashset all_groups =
+				{ .equal = h_eq, .hash = h_h, .free = h_free };
+		hs_for_each(&data->comps, &all_groups, v_init_all_groups);
+		size_t prev_all_groups = 0;
+		while (all_groups.entry_count != prev_all_groups) {
+			prev_all_groups = all_groups.entry_count;
+			printf("there are %zu groups\n", all_groups.entry_count);
+			struct hashset add_groups = { .equal = h_eq, .hash = h_h };
+			struct cag_arg arg = { &all_groups, &add_groups };
+			hs_for_each(&all_groups, &arg, v_calc_add_groups);
+			hs_for_each(&add_groups, &all_groups, v_hs_set);
+			hs_clear(&add_groups);
+		}
+		struct hashset max = { .entry_count = 0 };
+		struct hashset *maxp = &max;
+		hs_for_each(&all_groups, &maxp, v_find_max_group);
+		struct g_arg arg = { malloc(
+				sizeof(struct computer*) * maxp->entry_count) };
+		hs_for_each(maxp, &arg, v_gather);
+		qsort(arg.list, maxp->entry_count, sizeof(struct computer*), c_com);
+		fputs(STEP_BODY, solution_out);
+		for (off_t i = 0; i < maxp->entry_count; ++i) {
+			if (i) {
+				fprintf(solution_out, ",%s", arg.list[i]->name);
+			} else {
+				fputs(arg.list[i]->name, solution_out);
+			}
+		}
+		fputs("\n" STEP_FINISHED, solution_out);
+	}
 	hs_clear(&data->comps);
 	free(data);
 	return u64toa(result);
