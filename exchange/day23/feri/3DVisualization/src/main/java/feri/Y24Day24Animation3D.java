@@ -234,14 +234,14 @@ public class Y24Day24Animation3D {
 					defaultType = nodeColors.get(node.name);
 				}
 				int type = defaultType;
-				double size = 2.0;
+				double size = 50.0;
 				double boxSize = size*NET_SIZE_FACTOR;
 				Y24GUIOutput3D23.DDDObject point = new Y24GUIOutput3D23.DDDObject(node.name, node.pos.x, node.pos.y, node.pos.z, boxSize, type);
 				points.add(point);
 				for (Node3D neighbour:node.neighbours) {
 					String lineName = node.name+"-"+neighbour.name;
 					int lineType=defaultLineType;
-					double lineSize = 0.5*NET_SIZE_FACTOR;
+					double lineSize = 25*NET_SIZE_FACTOR;
 //					if (cluster.contains(node.name) && cluster.contains(neighbour.name)) {
 //						lineType=0;
 //						lineSize=2*lineSize;
@@ -521,8 +521,6 @@ public class Y24Day24Animation3D {
 		
 		output = new Y24GUIOutput3D23("2024 Day 23 Part II", true);
 
-		World world = new World(); 
-		
 		Circuit circuit = new Circuit();
 		try (Scanner scanner = new Scanner(new File(inputfile))) {
 			while (scanner.hasNext()) {
@@ -538,24 +536,27 @@ public class Y24Day24Animation3D {
 					String reg2 = line.replaceFirst(OPERATION_RX, "$3");
 					String regTarget = line.replaceFirst(OPERATION_RX, "$4");
 					circuit.addRules(new Rule(reg1, op, reg2, regTarget));
-					world.addNode(regTarget, Arrays.asList(reg1, reg2));
 				}
 				else {
 					throw new RuntimeException("unknown line");
 				}
 			}
 
-			Map<String, Integer> nodeColors = new HashMap<>(); 
-			for (int i=0; i<=45; i++) {
-				nodeColors.put(reg("x",i), 12);
-				nodeColors.put(reg("y",i), 12);
-				nodeColors.put(reg("z",i), 10);
-			}
+			
+			showCircuit("ORIGINAL", circuit);
+			
+			Circuit cSwap1 = circuit.swap("mvb", "z08");
+			showCircuit("SWAP mvb z08", cSwap1);
 
-			world.create3DTopology();
-			world.show3D("INIT", nodeColors);
-			world.move3DNodes(20, 1, nodeColors);
-			world.move3DNodes(480, 20, nodeColors);
+			Circuit cSwap2 = cSwap1.swap("rds", "jss");
+			showCircuit("SWAP rds jss", cSwap2);
+			
+			Circuit cSwap3 = cSwap2.swap("wss", "z18");
+			showCircuit("SWAP wss z18", cSwap3, 1);
+			
+			Circuit cSwap4 = cSwap3.swap("bmn", "z23");
+			showCircuit("SWAP bmn z23", cSwap4);
+			
 
 			System.out.println(circuit);
 			
@@ -597,6 +598,30 @@ public class Y24Day24Animation3D {
 //				}
 //			}
 		}
+	}
+
+	private static void showCircuit(String title, Circuit circuit) {
+		showCircuit(title, circuit, Integer.MAX_VALUE);
+	}
+	private static void showCircuit(String title, Circuit circuit, int showIterations) {
+		World world = new World(); 		
+		Map<String, Integer> nodeColors = new HashMap<>(); 
+		for (Rule rule:circuit.rules.values()) {
+			if (rule.op.equals("AND")) {
+				nodeColors.put(rule.regTarget, 10);
+			}
+			if (rule.op.equals("OR")) {
+				nodeColors.put(rule.regTarget, 11);
+			}
+			if (rule.op.equals("XOR")) {
+				nodeColors.put(rule.regTarget, 12);
+			}
+			world.addNode(rule.regTarget, Arrays.asList(rule.reg1, rule.reg2));
+		}
+
+		world.create3DTopology();
+		world.move3DNodes(500, showIterations, nodeColors);
+		world.show3D(title, nodeColors);
 	}
 
 	private static List<Swap> limit(List<Swap> fullList, int cnt) {
