@@ -1,6 +1,9 @@
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -20,38 +23,37 @@ public class Y24Day24 {
 		}
 	}
 	
-	public static void mainPart1(String inputfile) throws FileNotFoundException {
-
-		Map<String, Rule> rules = new LinkedHashMap<>();
-		Map<String, Integer> regs = new LinkedHashMap<>();
-		
-		try (Scanner scanner = new Scanner(new File(inputfile))) {
-			while (scanner.hasNext()) {
-				String line = scanner.nextLine().trim();
-				if (line.isBlank()) {
-					continue;
-				}
-				if (line.matches(START_RX)) {
-					String reg = line.replaceFirst(START_RX, "$1");
-					int initValue = Integer.parseInt(line.replaceFirst(START_RX, "$2"));
-					regs.put(reg, initValue);
-				}
-				else if (line.matches(OPERATION_RX)) {
-					String reg1 = line.replaceFirst(OPERATION_RX, "$1");
-					String op = line.replaceFirst(OPERATION_RX, "$2");
-					String reg2 = line.replaceFirst(OPERATION_RX, "$3");
-					String regTarget = line.replaceFirst(OPERATION_RX, "$4");
-					Rule exists = rules.put(regTarget, new Rule(reg1, op, reg2, regTarget));
-					if (exists != null) {
-						throw new RuntimeException("duplicate rule for same target "+regTarget);
-					}
-				}
-				else {
-					throw new RuntimeException("unknown line");
-				}
+	public static class Circuit {
+		Map<String, Rule> rules;
+		Map<String, Integer> regs;
+		public Circuit() {
+			rules = new LinkedHashMap<>();
+			regs = new LinkedHashMap<>();
+		}
+		public void setRegValue(String reg, int value) {
+			regs.put(reg, value);
+		}
+		public void addRules(Rule rule) {
+			if (rules.containsKey(rule.regTarget)) {
+				throw new RuntimeException("duplicate rule target "+rule.regTarget);
 			}
-			System.out.println(regs);
-			System.out.println(rules);
+			rules.put(rule.regTarget, rule);			
+		}
+		@Override
+		public String toString() {
+			StringBuilder result = new StringBuilder();
+			for (Rule rule:rules.values()) {
+				result.append(rule.toString()).append("\n");
+			}
+			result.append("\n");
+			List<String> sortedRegs = new ArrayList<>(regs.keySet());
+			Collections.sort(sortedRegs);
+			for (String reg:sortedRegs) {
+				result.append(reg+": "+regs.get(reg));
+			}
+			return result.toString();
+		}
+		public void calcAll() {
 			boolean changed = true;
 			while (changed) {
 				changed=false;
@@ -85,15 +87,59 @@ public class Y24Day24 {
 					changed = true;
 				}
 			}
-			System.out.println(regs);
-			String resultBits = "";
-			int i = 0;
-			while (regs.get(z(i)) != null) {
-				resultBits = regs.get(z(i)) + resultBits;
+		}
+		public String getBinString(String prefix) {
+			String result = "";
+			int i=0;
+			while (true) {
+				String num = Integer.toString(i);
+				if (i<10) {
+					num = "0"+num;
+				}
+				String reg = prefix+num;
+				if (!regs.containsKey(reg)) {
+					break;
+				}
+				result = regs.get(reg) + result;
 				i++;
 			}
-			System.out.println("RESULT: "+resultBits);
-			System.out.println("      = "+Long.parseLong(resultBits,2));
+			return result;
+		}
+		public long getBinValue(String prefix) {
+			return Long.parseLong(getBinString(prefix), 2);
+		}
+	}
+	
+	public static void mainPart1(String inputfile) throws FileNotFoundException {
+
+		Circuit circuit = new Circuit();
+		try (Scanner scanner = new Scanner(new File(inputfile))) {
+			while (scanner.hasNext()) {
+				String line = scanner.nextLine().trim();
+				if (line.isBlank()) {
+					continue;
+				}
+				if (line.matches(START_RX)) {
+					String reg = line.replaceFirst(START_RX, "$1");
+					int initValue = Integer.parseInt(line.replaceFirst(START_RX, "$2"));
+					circuit.setRegValue(reg, initValue);
+				}
+				else if (line.matches(OPERATION_RX)) {
+					String reg1 = line.replaceFirst(OPERATION_RX, "$1");
+					String op = line.replaceFirst(OPERATION_RX, "$2");
+					String reg2 = line.replaceFirst(OPERATION_RX, "$3");
+					String regTarget = line.replaceFirst(OPERATION_RX, "$4");
+					circuit.addRules(new Rule(reg1, op, reg2, regTarget));
+				}
+				else {
+					throw new RuntimeException("unknown line");
+				}
+			}
+			System.out.println(circuit);
+			circuit.calcAll();
+			System.out.println(circuit);
+			System.out.println("RESULT: "+circuit.getBinString("z"));
+			System.out.println("      = "+circuit.getBinValue("z"));
 			
 		}
 	}
