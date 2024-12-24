@@ -54,6 +54,8 @@ enum operation {
 	op_and, op_or, op_xor
 };
 
+static const char *opstr[] = { "AND", "OR", "XOR" };
+
 struct gate {
 	struct wire *in0;
 	struct wire *in1;
@@ -88,6 +90,76 @@ static void w_free(void *a) {
 
 static int do_print = 1;
 
+static int p(FILE *str, struct data *data, int ident, struct wire *w) {
+	int doident = 0;
+	ident += fprintf(str, "%s", w->name);
+	for (uint64_t i = 0; i < data->gates_count; ++i) {
+		if (data->gates[i].out == w) {
+			if (doident) {
+				fprintf(str, "%*s", ident, "");
+			} else {
+				ident += fprintf(str, " <-- ");
+			}
+			if (p(str, data, ident, data->gates[i].in0))
+				fputc('\n', str);
+			int sident = fprintf(str, "%*s%s ", ident, "",
+					opstr[data->gates[i].op]);
+			if (p(str, data, sident, data->gates[i].in1))
+				fputc('\n', str);
+			doident = 109;
+		}
+	}
+	return !doident;
+}
+
+static int v_collect_zs(void *param, void *element) {
+	struct wire **arg = param;
+	struct wire *val = element;
+	if (val->name[0] == 'z') {
+		unsigned long bit = strtoul(val->name + 1, 0, 10);
+		arg[bit] = val;
+	}
+	return 0;
+}
+
+static int find(struct data *data, int n, struct wire *out, struct wire **a,
+		struct wire **b, struct wire **c) {
+	*a = 0;
+	*b = 0;
+	*c = 0;
+	for (uint64_t i = 0; i < data->gates_count; ++i) {
+		if (data->gates[i].out == out) {
+			if (!*a) {
+				if (data->gates[i].op != op_xor)
+					return 0;
+				*a = data->gates[i].in0;
+				*b = data->gates[i].in1;
+			} else
+				return 0;
+		}
+	}
+	if (!*b)
+		return 0;
+	for (uint64_t i = 0; i < data->gates_count; ++i) {
+		if (data->gates[i].op != op_xor)
+			continue;
+		if (data->gates[i].out == (*a)) {
+			if (*c)
+				return 0;
+			*a = data->gates[i].in0;
+			*c = data->gates[i].in1;
+		} else if (data->gates[i].out == (*b)) {
+			if (*c)
+				return 0;
+			*b = data->gates[i].in0;
+			*c = data->gates[i].in1;
+		}
+	}
+	if (!*c)
+		return !n;
+	return 1;
+}
+
 static void print(FILE *str, struct data *data, uint64_t result) {
 	if (result) {
 		fprintf(str, "%sresult=%"I64"u\n%s", STEP_HEADER, result, STEP_BODY);
@@ -97,11 +169,22 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 	if (!do_print && !interactive) {
 		return;
 	}
+	struct wire *zlist[64] = { 0 };
+	hs_for_each(&data->wires, zlist, v_collect_zs);
+	for (int i = 0; i < 64; ++i) {
+		if (!zlist[i])
+			continue;
+		struct wire *a, *b, *c;
+		int r = find(data, i, zlist[i], &a, &b, &c);
+		printf("find(%d,%s)=%d: %s %s %s\n", i, zlist[i]->name, r,
+				a ? a->name : 0, b ? b->name : 0, c ? c->name : 0);
+		if (p(str, data, 0, zlist[i]))
+			fputc('\n', str);
+	}
 	fputs(interactive ? STEP_FINISHED : RESET, str);
 }
 
-const char* solve(const char *path) {
-	struct data *data = read_data(path);
+const char* solvep1(struct data *data) {
 	uint64_t result = data->init_result;
 	for (int iter = 0; data->valueless_zwire_count; ++iter) {
 		print(solution_out, data, result);
@@ -154,8 +237,26 @@ const char* solve(const char *path) {
 		}
 	}
 	print(solution_out, data, result);
-	free(data);
 	return u64toa(result);
+}
+
+const char* solvep2(struct data *data) {
+	print(solution_out, data, data->init_result);
+	return "";
+}
+
+const char* solve(const char *path) {
+	struct data *data = read_data(path);
+	const char *result;
+	if (part == 1) {
+		result = solvep1(data);
+	} else {
+		result = solvep2(data);
+	}
+	hs_clear(&data->wires);
+	free(data->gates);
+	free(data);
+	return result;
 }
 
 static void* comp_wire(void *param, void *element) {
