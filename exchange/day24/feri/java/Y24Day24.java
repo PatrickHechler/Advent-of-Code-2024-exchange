@@ -129,7 +129,21 @@ public class Y24Day24 {
 			return result;
 		}
 		public long getBinValue(String prefix) {
-			return Long.parseLong(getBinString(prefix), 2);
+			long result = 0;
+		    long bit=1;
+			int i=0;
+			while (true) {
+				String reg = i<10 ? "z0"+i : "z"+i;
+				if (!regs.containsKey(reg)) {
+					break;
+				}
+				if (regs.get(reg)==1) {
+					result = result | bit;
+				}
+				bit = bit << 1;
+				i++;
+			}
+			return result;
 		}
 		public void clearRegs() {
 			regs.clear();
@@ -190,11 +204,17 @@ public class Y24Day24 {
 					throw new RuntimeException("unknown line");
 				}
 			}
-			System.out.println(circuit);
+//			System.out.println(circuit);
 			circuit.calcAll();
-			System.out.println(circuit);
-			System.out.println("RESULT: "+circuit.getBinString("z"));
+//			System.out.println(circuit);
+//			System.out.println("RESULT: "+circuit.getBinString("z"));
 			System.out.println("      = "+circuit.getBinValue("z"));
+		}
+	}
+	
+	record Swap(String target1, String target2, int err) {
+		@Override public String toString() {
+			return target1+"<->"+target2+"["+err+"]";
 		}
 	}
 
@@ -220,40 +240,95 @@ public class Y24Day24 {
 				}
 			}
 			System.out.println(circuit);
-			ErrStats es = findWeakBits(circuit, 10000);
-			System.out.println("Error Stats: "+es);
 			
+			ErrStats es = findWeakBits(circuit, 10000, false);
 			long x = es.errX;
 			long y = es.errY;
-			int bestCntErrBits = es.cntErrBits;
-			String bestSwap1 = null;
-			String bestSwap2 = null;
-			List<String> ruleTargets = circuit.getRuleTargets();
-			for (String target1:ruleTargets) {
-				for (String target2:ruleTargets) {
-					if (target1.equals(target2)) {
-						continue;
+			List<Swap> bestSwaps1 = qoptimize(circuit, x, y);
+			for (Swap bestSwap1:bestSwaps1) {
+				System.out.println();
+				System.out.println("SWAP1 "+bestSwap1);
+				Circuit swapped1Circuit = circuit.swap(bestSwap1.target1, bestSwap1.target2); 
+				List<Swap> bestSwaps2 = qoptimize(swapped1Circuit, x, y);
+				bestSwaps2 = limit(bestSwaps2, 10);
+				for (Swap bestSwap2:bestSwaps2) {
+					System.out.println();
+					System.out.println("SWAP-2 "+bestSwap2+" SWAP-1 "+bestSwap1);
+					Circuit swapped2Circuit = swapped1Circuit.swap(bestSwap2.target1, bestSwap2.target2); 
+					List<Swap> bestSwaps3 = qoptimize(swapped2Circuit, x, y);
+					bestSwaps3 = limit(bestSwaps3, 10);
+					for (Swap bestSwap3:bestSwaps3) {
+						System.out.println();
+						System.out.println("SWAP~3 "+bestSwap3+" SWAP~2 "+bestSwap2+" SWAP~1 "+bestSwap1);
+						Circuit swapped3Circuit = swapped2Circuit.swap(bestSwap3.target1, bestSwap3.target2); 
+						List<Swap> bestSwaps4 = qoptimize(swapped3Circuit, x, y);
+						for (Swap bestSwap4:bestSwaps4) {
+							if (bestSwap4.err>0) {
+								break;
+							}
+							System.out.println();
+							System.out.println("SWAP:4 "+bestSwap4+" SWAP:3 "+bestSwap3+" SWAP:2 "+bestSwap2+" SWAP:1 "+bestSwap1);
+							Circuit swapped4Circuit = swapped3Circuit.swap(bestSwap4.target1, bestSwap4.target2);
+							es = findWeakBits(swapped4Circuit, 10000, true);
+							System.out.println(es);
+							if (es.cntWeakBits == 0) {
+								return;
+							}
+						}
 					}
-					Circuit swappedCircuit = circuit.swap(target1, target2);
-					int cntErrBits = countErrBits(swappedCircuit, x, y);
-					if (cntErrBits <= bestCntErrBits) {
-						bestCntErrBits = cntErrBits;
-						bestSwap1 = target1;
-						bestSwap2 = target2;
-						System.out.println("CntErrBits: "+cntErrBits+" "+target1+" <-> "+target2);
-					}
-							
 				}
 			}
-			
 		}
+	}
+
+	private static List<Swap> limit(List<Swap> fullList, int cnt) {
+		List<Swap> result = new ArrayList<>();
+		for (int i=0; i<cnt; i++) {
+			result.add(fullList.get(i));
+		}
+		return result;
+	}
+
+
+	private static List<Swap> qoptimize(Circuit circuit, long x, long y) {
+		int bestCntErrBits = Integer.MAX_VALUE;
+		List<Swap> bestSwaps = new ArrayList<>();
+		List<String> ruleTargets = circuit.getRuleTargets();
+		for (int i=0; i<ruleTargets.size(); i++) {
+			String target1=ruleTargets.get(i);
+			for (int j=i+1; j<ruleTargets.size(); j++) {
+				String target2=ruleTargets.get(j);
+				Circuit swappedCircuit = circuit.swap(target1, target2);
+				int cntErrBits;
+				try {
+					cntErrBits = countErrBits(swappedCircuit, x, y);
+				}
+				catch (NumberFormatException e) {
+					// unreachable X   - SWAP1 jrp<->qmd[8] SWAP2 bpr<->ggm[6]
+					continue;
+				}
+				bestSwaps.add(new Swap(target1, target2, cntErrBits));
+				if (cntErrBits < bestCntErrBits) {
+					bestCntErrBits = cntErrBits;
+					if (cntErrBits == 0) {
+						bestSwaps.clear();
+						bestSwaps.add(new Swap(target1, target2, cntErrBits));
+						System.out.println("SOLUTION "+target1+"<->"+target2);
+						return bestSwaps;
+					}
+					System.out.println("CntErrBits: "+cntErrBits+" "+target1+" <-> "+target2);
+				}
+			}
+		}
+		Collections.sort(bestSwaps, (sw1,sw2)->Integer.compare(sw1.err, sw2.err));
+		return bestSwaps;
 	}
 
 	static Random rand = new Random(1);
 
 	static record ErrStats(long errX, long errY, long errMaskZ, int cntErrBits, long weakBits, int cntWeakBits) {}
 	
-	private static ErrStats findWeakBits(Y24Day24.Circuit circuit, int iterations) {
+	private static ErrStats findWeakBits(Circuit circuit, int iterations, boolean quitImmediately) {
 		long maxErrBits = 0L;
 		int maxCntErrBits = 0;
 		long maxErrBitsX = 0L;
@@ -271,16 +346,19 @@ public class Y24Day24 {
 			long zComp = circuit.getZ();
 			long errBits = zComp ^ z;
 			int cntErrBits = Long.bitCount(errBits);
+			weakBits = weakBits | errBits;
+			if (weakBits != lastWeakBits) {
+				lastWeakBits = weakBits;
+				System.out.println(i+": "+Long.toString(weakBits, 2));
+			}
 			if (cntErrBits>maxCntErrBits) {
 				maxCntErrBits = cntErrBits;
 				maxErrBits = errBits;
 				maxErrBitsX = x;
 				maxErrBitsY = y;
-			}
-			weakBits = weakBits | errBits;
-			if (weakBits != lastWeakBits) {
-				lastWeakBits = weakBits;
-				System.out.println(i+": "+Long.toString(weakBits, 2));
+				if (quitImmediately) {
+					return new ErrStats(maxErrBitsX, maxErrBitsY, maxErrBits, maxCntErrBits, weakBits, Long.bitCount(weakBits));
+				}
 			}
 		}
 		List<String> result = new ArrayList<>();
@@ -312,7 +390,7 @@ public class Y24Day24 {
 	public static void main(String[] args) throws FileNotFoundException {
 		System.out.println("--- PART I  ---");
 //		mainPart1("exchange/day24/feri/input-example.txt");
-//		mainPart1("exchange/day24/feri/input.txt");     
+//		mainPart1("exchange/day24/feri/input.txt");
 		System.out.println("---------------");
 		System.out.println();
 		System.out.println("--- PART II ---");
