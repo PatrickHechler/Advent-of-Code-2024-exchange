@@ -12,7 +12,7 @@ fn main() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         return Err(String::from(
-            "Usage: cargo run --bin day18 INPUT [TEST_FLAG]",
+            "Usage: cargo run --bin day22 INPUT",
         ));
     }
 
