@@ -44,6 +44,9 @@ struct pos {
 	num y;
 };
 
+#if AOC_COMPAT
+#	include <sys/random.h>
+#endif
 struct wire {
 	char *name;
 	unsigned value :1;
@@ -92,13 +95,17 @@ static int do_print = 1;
 
 static int p(FILE *str, struct data *data, int ident, struct wire *w) {
 	int doident = 0;
-	ident += fprintf(str, "%s", w->name);
+	if (w->has_value) {
+		ident += fprintf(str, "%s=%u", w->name, w->value);
+	} else {
+		ident += fprintf(str, "%s", w->name);
+	}
 	for (uint64_t i = 0; i < data->gates_count; ++i) {
 		if (data->gates[i].out == w) {
 			if (doident) {
 				fprintf(str, "%*s", ident, "");
 			} else {
-				ident += fprintf(str, " <-- ");
+				ident += fprintf(str, " < ");
 			}
 			if (p(str, data, ident, data->gates[i].in0))
 				fputc('\n', str);
@@ -118,6 +125,29 @@ static int v_collect_zs(void *param, void *element) {
 	if (val->name[0] == 'z') {
 		unsigned long bit = strtoul(val->name + 1, 0, 10);
 		arg[bit] = val;
+	}
+	return 0;
+}
+
+struct cxy_arg {
+	struct wire **x;
+	struct wire **y;
+	struct wire **z;
+};
+static int v_collect_xyzs(void *param, void *element) {
+	struct cxy_arg *arg = param;
+	struct wire *val = element;
+	if (val->name[0] == 'x') {
+		unsigned long bit = strtoul(val->name + 1, 0, 10);
+		arg->x[bit] = val;
+	}
+	if (val->name[0] == 'y') {
+		unsigned long bit = strtoul(val->name + 1, 0, 10);
+		arg->y[bit] = val;
+	}
+	if (val->name[0] == 'z') {
+		unsigned long bit = strtoul(val->name + 1, 0, 10);
+		arg->z[bit] = val;
 	}
 	return 0;
 }
@@ -176,7 +206,7 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 			continue;
 		struct wire *a, *b, *c;
 		int r = find(data, i, zlist[i], &a, &b, &c);
-		printf("find(%d,%s)=%d: %s %s %s\n", i, zlist[i]->name, r,
+		printf("\nfind(%d,%s)=%d: %s %s %s\n", i, zlist[i]->name, r,
 				a ? a->name : 0, b ? b->name : 0, c ? c->name : 0);
 		if (p(str, data, 0, zlist[i]))
 			fputc('\n', str);
@@ -184,11 +214,13 @@ static void print(FILE *str, struct data *data, uint64_t result) {
 	fputs(interactive ? STEP_FINISHED : RESET, str);
 }
 
-const char* solvep1(struct data *data) {
+const uint64_t solvep1(struct data *data) {
 	uint64_t result = data->init_result;
 	for (int iter = 0; data->valueless_zwire_count; ++iter) {
-		print(solution_out, data, result);
-		printf("start iteration %d\n", iter);
+		if (part == 1) {
+			print(solution_out, data, result);
+			printf("start iteration %d\n", iter);
+		}
 		for (uint64_t i = 0; i < data->gates_count; ++i) {
 			if (data->gates[i].in0->has_value
 					&& data->gates[i].in1->has_value) {
@@ -236,12 +268,100 @@ const char* solvep1(struct data *data) {
 			}
 		}
 	}
-	print(solution_out, data, result);
-	return u64toa(result);
+	if (part == 1) {
+		print(solution_out, data, result);
+	}
+	return result;
 }
+
+enum purpose {
+	/* unknown */
+	___,
+	/* _NN XOR CNN */
+	ZNN,
+	/* xN XOR yN */
+	_NN,
+	/* CARRY for N (NOT CARRY FROM N) */
+	CNN,
+	/* xN-1 AND yN-1 */
+	ANN,
+	/* CN-1 AND _N-1
+	 * or CN-1 AND ON-1 */
+	BNN,
+	/* xN OR yN */
+	ONN,
+};
+
+struct usage {
+	struct wire *w;
+	enum purpose p;
+	int n;
+};
 
 const char* solvep2(struct data *data) {
 	print(solution_out, data, data->init_result);
+	uint64_t in_mask = UINT64_C(1) << data->valueless_zwire_count;
+	struct wire *xin[data->valueless_zwire_count - 1];
+	struct wire *yin[data->valueless_zwire_count - 1];
+	struct wire *zout[data->valueless_zwire_count - 1];
+	struct cxy_arg arg = { xin, yin, zout };
+	hs_for_each(&data->wires, &arg, v_collect_xyzs);
+	struct swap_list {
+		struct wire *a;
+		struct wire *b;
+		struct swap_list *next;
+	} *swaps = 0;
+	const uint64_t zwire_count = data->valueless_zwire_count;
+	for (;;) {
+		uint64_t err_mask = 0;
+		for (int i = 0; i < 10; ++i) {
+			for (int ii = 0; ii < 1024; ii += 2) {
+				uint64_t random_buf[1024];
+#if AOC_COMPAT & AC_GTRND
+				/* it's not nice to ask the kernel for so much randomness, but it's
+				 * better than the other easy alternative */
+				for (size_t remain = sizeof(random_buf); remain;) {
+					ssize_t r = getrandom(
+							(char*) random_buf + sizeof(random_buf) - remain,
+							remain, 0);
+					if (r < 0) {
+						if (errno == EAGAIN || errno == EINTR) {
+							continue;
+						}
+						perror("getrandom");
+						exit(4);
+					}
+					remain -= r;
+				}
+#else
+				srand(time(NULL) ^ clock());
+				for (char *buf = random_buf, *end = buf + sizeof(random_buf); buf < end;
+						++buf) {
+					*buf = rand();
+				}
+#endif
+				data->valueless_zwire_count = zwire_count;
+				uint64_t xval = random_buf[ii] & in_mask;
+				uint64_t yval = random_buf[ii + 1] & in_mask;
+				uint64_t expected_result = xval + yval;
+				for (int s = 0; s < zwire_count - 1; ++s) {
+					xin[s]->value = !!((UINT64_C(1) << s) & xval);
+					yin[s]->value = !!((UINT64_C(1) << s) & yval);
+					zout[s]->has_value = 0;
+					zout[s]->value = 0;
+				}
+				zout[zwire_count - 1]->has_value = 0;
+				zout[zwire_count - 1]->value = 0;
+				solvep1(data);
+				uint64_t real_result = 0;
+				for (int s = 0; s < zwire_count; ++s) {
+					real_result |= (uint64_t) zout[s]->value << s;
+				}
+				err_mask |= expected_result ^ real_result;
+			}
+		}
+		break;
+	}
 	return "";
 }
 
@@ -249,7 +369,7 @@ const char* solve(const char *path) {
 	struct data *data = read_data(path);
 	const char *result;
 	if (part == 1) {
-		result = solvep1(data);
+		result = u64toa(solvep1(data));
 	} else {
 		result = solvep2(data);
 	}

@@ -11,14 +11,19 @@
 #define AC_POSIX 1
 #define AC_REARR 2
 #define AC_STRCN 4
+#define AC_GTRND 8
 /* only set AOC_COMPAT if not set by the CFLAGS */
 #ifndef AOC_COMPAT
-#	if defined __FreeBSD__ || (defined __gnu_linux__ || defined __GNU__ || defined __GLIBC__)
+#	if defined __gnu_linux__
+#		define AOC_COMPAT (AC_POSIX | AC_REARR | AC_STRCN | AC_GTRND)
+#	elif defined __FreeBSD__ || (defined __GNU__ || defined __GLIBC__)
 #		define AOC_COMPAT (AC_POSIX | AC_REARR | AC_STRCN)
 #	elif defined __OpenBSD__
 #		define AOC_COMPAT (AC_POSIX | AC_REARR)
 #	elif defined __NetBSD__
 #		define AOC_COMPAT (AC_POSIX | AC_STRCN)
+#	elif defined __linux__
+#		define AOC_COMPAT (AC_POSIX | AC_GTRND)
 #	elif defined __unix__ \
 		|| (defined __bsdi__ || defined __DragonFly__) \
 		|| (defined __APPLE__ && defined __MACH__)
