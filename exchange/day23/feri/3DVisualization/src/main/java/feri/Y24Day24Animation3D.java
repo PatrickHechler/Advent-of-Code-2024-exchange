@@ -74,11 +74,13 @@ public class Y24Day24Animation3D {
 		String name;
 		Pos3D pos;
 		Pos3D newPos;
+		boolean fix;
 		Set<Node3D> neighbours;
 		public Node3D(String name, Pos3D pos) {
 			this.name = name;
 			this.pos = pos;
 			neighbours = new LinkedHashSet<>();
+			this.fix = false;
 		}
 		@Override public String toString() {
 			return name+"["+pos+"#"+neighbours.size()+"]";
@@ -137,7 +139,28 @@ public class Y24Day24Animation3D {
 		public void create3DTopology() {
 			nodes3D = new HashMap<>();
 			for (Node node:nodes.values()) {
-				Node3D node3D = new Node3D(node.name, randomPos3D());
+				Node3D node3D;
+				if (node.name.startsWith("z")) {
+					int i=Integer.parseInt(node.name.substring(1));
+					Pos3D pos = new Pos3D(2000.0*i/45-1000.0,0,1000);
+					node3D = new Node3D(node.name, pos);
+					node3D.fix = true;
+				}
+				else if (node.name.startsWith("x")) {
+					int i=Integer.parseInt(node.name.substring(1));
+					Pos3D pos = new Pos3D(2000.0*i/45-1000.0,-1000,-1000);
+					node3D = new Node3D(node.name, pos);
+					node3D.fix = true;
+				}
+				else if (node.name.startsWith("y")) {
+					int i=Integer.parseInt(node.name.substring(1));
+					Pos3D pos = new Pos3D(2000.0*i/45-1000.0,1000,-1000);
+					node3D = new Node3D(node.name, pos);
+					node3D.fix = true;
+				}
+				else {
+					node3D = new Node3D(node.name, randomPos3D());
+				}
 				nodes3D.put(node3D.name, node3D);
 			}
 			for (Node node:nodes.values()) {
@@ -154,6 +177,10 @@ public class Y24Day24Animation3D {
 		}
 		public void move3DNodes() {
 			for (Node3D node:nodes3D.values()) {
+				if (node.fix) {
+					node.newPos = node.pos;
+					continue;
+				}
 				Pos3D sum = new Pos3D(0,0,0);
 //				System.out.println("NODE "+node);
 				int cntTargets = 0;
@@ -197,14 +224,14 @@ public class Y24Day24Animation3D {
 			}
 		}
 
-		public void show3D(String info, Set<String> cluster) {
+		public void show3D(String info, Map<String, Integer> nodeColors) {
 			List<Y24GUIOutput3D23.DDDObject> points = new ArrayList<>();
 			for (Node3D node:nodes3D.values()) {
 				int defaultType = 11;
 				int defaultLineType = 3;
-				if ((cluster != null) && cluster.contains(node.name)) {
+				if ((nodeColors != null) && nodeColors.containsKey(node.name)) {
 					// defaultLineType = 0;
-					defaultType = 10;
+					defaultType = nodeColors.get(node.name);
 				}
 				int type = defaultType;
 				double size = 2.0;
@@ -215,10 +242,10 @@ public class Y24Day24Animation3D {
 					String lineName = node.name+"-"+neighbour.name;
 					int lineType=defaultLineType;
 					double lineSize = 0.5*NET_SIZE_FACTOR;
-					if (cluster.contains(node.name) && cluster.contains(neighbour.name)) {
-						lineType=0;
-						lineSize=2*lineSize;
-					}
+//					if (cluster.contains(node.name) && cluster.contains(neighbour.name)) {
+//						lineType=0;
+//						lineSize=2*lineSize;
+//					}
 					Y24GUIOutput3D23.DDDObject line = new Y24GUIOutput3D23.DDDLineObject(lineName, node.pos.x, node.pos.y, node.pos.z, neighbour.pos.x, neighbour.pos.y, neighbour.pos.z, lineSize, 30+lineType);
 					points.add(line);
 				}
@@ -270,11 +297,11 @@ public class Y24Day24Animation3D {
 			}
 			return result;
 		}
-		public void move3DNodes(long iterations, int show, Set<String> cluster) {
+		public void move3DNodes(long iterations, int show, Map<String, Integer> nodeColors) {
 			for (int n=0; n<iterations; n++) {
 				move3DNodes();
 				if ((show>0) && (n%show)==show-1) {
-					show3D("iteration "+n, cluster);
+					show3D("iteration "+n, nodeColors);
 				}
 			}
 		}
@@ -518,14 +545,17 @@ public class Y24Day24Animation3D {
 				}
 			}
 
-			Set<String> cluster = new LinkedHashSet<>();
-			for (int i=0; i<45; i++) {
-				cluster.add(reg("z",i));
+			Map<String, Integer> nodeColors = new HashMap<>(); 
+			for (int i=0; i<=45; i++) {
+				nodeColors.put(reg("x",i), 12);
+				nodeColors.put(reg("y",i), 12);
+				nodeColors.put(reg("z",i), 10);
 			}
+
 			world.create3DTopology();
-			world.show3D("INIT", cluster);
-			world.move3DNodes(20, 1, cluster);
-			world.move3DNodes(480, 20, cluster);
+			world.show3D("INIT", nodeColors);
+			world.move3DNodes(20, 1, nodeColors);
+			world.move3DNodes(480, 20, nodeColors);
 
 			System.out.println(circuit);
 			
