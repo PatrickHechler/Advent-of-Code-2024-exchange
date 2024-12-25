@@ -305,6 +305,14 @@ public class Y24Day24Animation3D {
 				}
 			}
 		}
+		public void keepNodePositions(World other) {
+			for (Node3D otherNode:other.nodes3D.values()) {
+				Node3D ownNode = nodes3D.get(otherNode.name);
+				if (ownNode != null) {
+					ownNode.pos = otherNode.pos;
+				}
+			}
+		}
 	}
 	
 	
@@ -542,69 +550,31 @@ public class Y24Day24Animation3D {
 				}
 			}
 
-			
-			showCircuit("ORIGINAL", circuit);
+			World world = new World();
+			world = showCircuit("ORIGINAL", world, circuit, 1);
 			
 			Circuit cSwap1 = circuit.swap("mvb", "z08");
-			showCircuit("SWAP mvb z08", cSwap1);
+			world = showCircuit("SWAP mvb z08", world, cSwap1);
 
 			Circuit cSwap2 = cSwap1.swap("rds", "jss");
-			showCircuit("SWAP rds jss", cSwap2);
+			world = showCircuit("SWAP rds jss", world, cSwap2);
 			
 			Circuit cSwap3 = cSwap2.swap("wss", "z18");
-			showCircuit("SWAP wss z18", cSwap3, 1);
-			
+			world = showCircuit("SWAP wss z18", world, cSwap3, 1);
+
 			Circuit cSwap4 = cSwap3.swap("bmn", "z23");
-			showCircuit("SWAP bmn z23", cSwap4);
+			world = showCircuit("SWAP bmn z23", world, cSwap4, 1);
 			
 
-			System.out.println(circuit);
-			
-//			ErrStats es = findWeakBits(circuit, 10000, false);
-//			long x = es.errX;
-//			long y = es.errY;
-//			List<Swap> bestSwaps1 = qoptimize(circuit, x, y);
-//			for (Swap bestSwap1:bestSwaps1) {
-//				System.out.println();
-//				System.out.println("SWAP1 "+bestSwap1);
-//				Circuit swapped1Circuit = circuit.swap(bestSwap1.target1, bestSwap1.target2); 
-//				List<Swap> bestSwaps2 = qoptimize(swapped1Circuit, x, y);
-//				bestSwaps2 = limit(bestSwaps2, 10);
-//				for (Swap bestSwap2:bestSwaps2) {
-//					System.out.println();
-//					System.out.println("SWAP-2 "+bestSwap2+" SWAP-1 "+bestSwap1);
-//					Circuit swapped2Circuit = swapped1Circuit.swap(bestSwap2.target1, bestSwap2.target2); 
-//					List<Swap> bestSwaps3 = qoptimize(swapped2Circuit, x, y);
-//					bestSwaps3 = limit(bestSwaps3, 10);
-//					for (Swap bestSwap3:bestSwaps3) {
-//						System.out.println();
-//						System.out.println("SWAP~3 "+bestSwap3+" SWAP~2 "+bestSwap2+" SWAP~1 "+bestSwap1);
-//						Circuit swapped3Circuit = swapped2Circuit.swap(bestSwap3.target1, bestSwap3.target2); 
-//						List<Swap> bestSwaps4 = qoptimize(swapped3Circuit, x, y);
-//						for (Swap bestSwap4:bestSwaps4) {
-//							if (bestSwap4.err>0) {
-//								break;
-//							}
-//							System.out.println();
-//							System.out.println("SWAP:4 "+bestSwap4+" SWAP:3 "+bestSwap3+" SWAP:2 "+bestSwap2+" SWAP:1 "+bestSwap1);
-//							Circuit swapped4Circuit = swapped3Circuit.swap(bestSwap4.target1, bestSwap4.target2);
-//							es = findWeakBits(swapped4Circuit, 10000, true);
-//							System.out.println(es);
-//							if (es.cntWeakBits == 0) {
-//								return;
-//							}
-//						}
-//					}
-//				}
-//			}
 		}
 	}
 
-	private static void showCircuit(String title, Circuit circuit) {
-		showCircuit(title, circuit, Integer.MAX_VALUE);
+	private static World showCircuit(String title, World world, Circuit circuit) {
+		return showCircuit(title, world, circuit, Integer.MAX_VALUE);
 	}
-	private static void showCircuit(String title, Circuit circuit, int showIterations) {
-		World world = new World(); 		
+	private static World showCircuit(String title, World oldWorld, Circuit circuit, int showIterations) {
+		
+		World world = new World();
 		Map<String, Integer> nodeColors = new HashMap<>(); 
 		for (Rule rule:circuit.rules.values()) {
 			if (rule.op.equals("AND")) {
@@ -620,8 +590,12 @@ public class Y24Day24Animation3D {
 		}
 
 		world.create3DTopology();
-		world.move3DNodes(500, showIterations, nodeColors);
+		
+		world.keepNodePositions(oldWorld);
+		
+		world.move3DNodes(30, showIterations, nodeColors);
 		world.show3D(title, nodeColors);
+		return world;
 	}
 
 	private static List<Swap> limit(List<Swap> fullList, int cnt) {
@@ -739,6 +713,7 @@ public class Y24Day24Animation3D {
 		System.out.println("--- PART II ---");
 //		mainPart2("exchange/day24/feri/input-example.txt");
 //		mainPart2("exchange/day24/feri/input.txt");   
+//		mainPart2("input-day24-patrick.txt");     
 		mainPart2("input-day24.txt");     
 		System.out.println("---------------");
 	}
