@@ -4,19 +4,24 @@
  *  Created on: Dec 2, 2024
  *      Author: pat
  */
-#include "interactive.h"
-#include "aoc.h"
-#include "hash.h"
 
+#include "aoc.h"
+
+#include <asm-generic/errno-base.h>
+#include <bits/stdint-intn.h>
+#include <bits/stdint-uintn.h>
+#include <bits/types/clock_t.h>
+#include <bits/types/FILE.h>
 #include <ctype.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 #include <time.h>
-#include <errno.h>
-#include <search.h>
-#include <string.h>
+
+#include "color.h"
+#include "hash.h"
+#include "interactive.h"
 
 #ifdef INTERACTIVE
 #define INTERACT(...) __VA_ARGS__
@@ -312,7 +317,7 @@ const char* solvep2(struct data *data) {
 		struct swap_list *next;
 	} *swaps = 0;
 	const uint64_t zwire_count = data->valueless_zwire_count;
-	for (;;) {
+	for (; 315;) {
 		uint64_t err_mask = 0;
 		for (int i = 0; i < 10; ++i) {
 			for (int ii = 0; ii < 1024; ii += 2) {
@@ -360,9 +365,15 @@ const char* solvep2(struct data *data) {
 				err_mask |= expected_result ^ real_result;
 			}
 		}
-		break;
+		if (!err_mask) {
+			printf("FOUND THE RESULT!!!\n");
+			for (struct swap_list *sl = 0; sl; sl = sl->next) {
+				printf("%s<->%s\n", sl->a, sl->b);
+			}
+			return "FINISH!";
+		}
+		//TODO pick a swap
 	}
-	return "";
 }
 
 const char* solve(const char *path) {
