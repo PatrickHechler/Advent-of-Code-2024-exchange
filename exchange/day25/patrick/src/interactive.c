@@ -858,12 +858,12 @@ static int ensure_rbuf(size_t free_space, size_t end_allocated_space) {
 			rbuf_pos = 0;
 			return 1;
 		}
-		buf = reallocarray(buf, buf_capacity, 2);
-		if (!buf) {
+		rbuf = reallocarray(rbuf, rbuf_capacity, 2);
+		if (!rbuf) {
 			perror("realloc");
 			exit(EXIT_FAILURE);
 		}
-		buf_capacity *= 2;
+		rbuf_capacity *= 2;
 		need_refill = 1;
 	}
 }
